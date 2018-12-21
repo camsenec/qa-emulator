@@ -3,11 +3,11 @@
       INTEGER N, N_STEP
       REAL*8 KT_INIT, KT_FIN, ALPHA, SETALPHA, KT
       INTEGER I, T, X, Y
-      INTEGER TMP
+      INTEGER IDX
 C     SPIN_A(:): 繊維前の状態,  SPIN_B(:): 遷移したとしたときの状態
       REAL*8, ALLOCATABLE, DIMENSION(:,:) :: SPIN_A, SPIN_B
 C     ENERG_A : 繊維前のエネルギー, ENERG_B : 遷移したとしたときのエネルギー, M: 磁化
-      REAL*8 ENERG, ENERG_A, ENERG_B, MAGNETIZATION, M
+      REAL*8 ENERG, ENERG_A, ENERG_B, M
 C     J : カップリング
       REAL*8, ALLOCATABLE, DIMENSION(:,:,:,:) :: J
 C     BETA : 1/KT, P: 反転させる確率, P_BASE : P>P_BASEであるときに反転させる
@@ -23,14 +23,14 @@ C     RESULT_EXPECTED : 熱平衡に達したあとの, DATA_DEVIDE ごとの期
 C     EPSILON : 微小な値
       REAL * 8,PARAMETER::EPSILON = 1E-5
 C     OUT : 書き出しファイルのための装置番号
-      INTEGER,PARAMETER::OUT = 17
+      INTEGER,PARAMETER::OUT = 17, IN = 18
 C     IN : 読み込みファイルのための装置番号
-      INTEGER,PARAMETER::IN = 18
+C      INTEGER,PARAMETER::IN = 18
 
       INTEGER DATA_MAX
 CC    SET DATA_DEVIDE!
 C     DATA_DEVIDE : DATA IS RECORDED EVERY @DATA_MAX TRIAL AND EXPECTED VALUE IS CALUCULATED USING @DATA_MAX RESULTS
-      INTEGER, PARAMETER::DATA_DEVIDE = 3000
+      INTEGER, PARAMETER::DATA_DEVIDE = 7
 CC    SET EQUILIBRIUM_VALUE!
 C     EQUILIBRIUM_VALUE : REGARD A STATE AS EQUILIBRIUMU STATE IF TIME IS BIGGER THAN THE VALUE OF THE PARAMETER
 C     IT IS SET BY RATE(0 ~ 10)
@@ -68,13 +68,9 @@ C     INITIALIZE OUTPUT FILE
       CALL SPNDAT(-1,SPIN_A,N,ENERG_A)
 
 C     INITIALIZE SPIN & ENERG_B
-      CALL INIT_ISING(SPIN_A,N)
-      DO Y = 1, N
-        DO X = 1, N
-          SPIN_B(Y,X) = SPIN_A(Y,X)
-        ENDDO
-      ENDDO
+      CALL INIT_SG(SPIN_A,N)
 
+C     INITIALIZE CPUPLING
       CALL INIT_COUPLING(J,N,IN)
 
       ENERG_A = ENERG(J, SPIN_A, N)
@@ -93,34 +89,41 @@ C     ======== MONTE-CARLO SIMULATION ========
          BETA = 1/DBLE(KT)
         ENDIF
 
-C      SELECT UPDATED SITE
-        CALL CHOOSE(SITE_X, SITE_Y, N)
-C       PRINT * ,'SITE_X : ', SITE_X,' SITE_Y', SITE_Y
-C       UPDATE SPIN BASED ON SPIN_A
-        CALL REVERSE_SPIN(SITE_X, SITE_Y, SPIN_A, SPIN_B, N)
+C       ATTEMPT INDEPENDENT SPIN FLIPS AT ALL SITES
+        DO SITE_X = 1, N
+          DO SITE_Y = 1, N
 
-C       CALCULATE ENERG_B
-        ENERG_B = ENERG(J, SPIN_B, N)
+C           SELECT UPDATED SITE
+C           CALL CHOOSE(SITE_X, SITE_Y, N)
+C           PRINT * ,'SITE_X : ', SITE_X,' SITE_Y', SITE_Y
 
-C       CALCULATE P
-C       PRINT * , 'T',T, 'ENERG_B', ENERG_B , 'ENERG_A', ENERG_A
-        IF (ENERG_B - ENERG_A <= 0) THEN
-          P = 1
-        ELSE
-          P = EXP(-BETA * (ENERG_B - ENERG_A))
-        ENDIF
+C           UPDATE SPIN BASED ON SPIN_A
+            CALL REVERSE_SPIN(SITE_X, SITE_Y, SPIN_A, SPIN_B, N)
 
-C       UPDATE ISING BASED ON PROBABILITY P
-        CALL RANDOM_NUMBER(P_BASE)
+C           CALCULATE ENERG_B
+            ENERG_B = ENERG(J, SPIN_B, N)
 
-        IF (P >= P_BASE) THEN
-C         PRINT * , 'UPDATE'
-          CALL UPDATE_ISING(SPIN_A, SPIN_B, N)
-          ENERG_A = ENERG_B
-        ENDIF
+C           CALCULATE P
+C           PRINT * , 'T',T, 'ENERG_B', ENERG_B , 'ENERG_A', ENERG_A
+            IF (ENERG_B - ENERG_A <= 0) THEN
+              P = 1
+            ELSE
+              P = EXP(-BETA * (ENERG_B - ENERG_A))
+            ENDIF
+
+C           UPDATE SPINGLASS BASED ON PROBABILITY P
+            CALL RANDOM_NUMBER(P_BASE)
+
+            IF (P >= P_BASE) THEN
+C             PRINT * , 'UPDATE'
+              SPIN_A = SPIN_B
+              ENERG_A = ENERG_B
+            ENDIF
+          ENDDO
+        ENDDO
 
 C       CALCULATE MAGNETIZATION
-        M = MAGNETIZATION(SPIN_A, N)
+        M = SUM(SPIN_A) / SIZE(SPIN_A)
 
 C       CONTAIN VALUE OF ENERG AND M^2 IN ARRAY
         RESULT_E(MOD(T,DATA_DEVIDE) + 1) = ENERG_A
@@ -132,13 +135,13 @@ C       OUTPUT EXPECTED VALUE EVERY 1000 SAMPLE TO FILE
           EXPECTED_M = SUM(RESULT_M) / SIZE(RESULT_M)
           PRINT * , KT, T, EXPECTED_E
           PRINT * , KT, T, EXPECTED_M
-          TMP = INT(T/DATA_DEVIDE) - EQUILIBRIUM_POINT
+          IDX = INT(T/DATA_DEVIDE) - EQUILIBRIUM_POINT
 C         OUTPUT FOR ANIMATION
           CALL SPNDAT(INT(T/DATA_DEVIDE),SPIN_A,N,EXPECTED_E)
 C         CONTAIN EXPECTED OF ENERG AND M^2 IN ARRAY
-          IF(TMP > 0) THEN
-            RESULT_EXPECTED_E(I) = EXPECTED_E
-            RESULT_EXPECTED_M(I) = EXPECTED_M
+          IF(IDX > 0) THEN
+            RESULT_EXPECTED_E(IDX) = EXPECTED_E
+            RESULT_EXPECTED_M(IDX) = EXPECTED_M
 C           PRINT * , T, EXPECTED_E
 C           PRINT * , T, EXPECTED_M
           ENDIF
@@ -176,7 +179,7 @@ C     WRITE(OUT, *) EXPECTED_E, EXPECTED_M
       DEALLOCATE(RESULT_M)
       DEALLOCATE(RESULT_EXPECTED_E)
       DEALLOCATE(RESULT_EXPECTED_M)
-      CLOSE(OUT)
+      CLOSE(IN,OUT)
       END
 
 
@@ -190,12 +193,13 @@ C     CALCULATE ENERGY OF GENERAL SITE
 
       ENERG = 0.0D0
 
-      DO IX = 1, N
-        DO IY = 1, N
-          DO JX = 1, N
-            DO JY = 1, N
+      DO JY = 1, N
+        DO JX = 1, N
+          DO IY = 1, N
+            DO IX = 1, N
               J_VAL = J(IX, IY, JX, JY)
-              ENERG = ENERG - 1/2.0 * J_VAL * SPIN(IY, IX) * SPIN(JY, JX)
+              ENERG = ENERG - 1/2.0 * J_VAL * SPIN(IX, IY) *
+     &SPIN(JX, JY)
             ENDDO
           ENDDO
         ENDDO
@@ -203,12 +207,6 @@ C     CALCULATE ENERGY OF GENERAL SITE
 
       END
 
-      DOUBLE PRECISION FUNCTION MAGNETIZATION(SPIN, N)
-      IMPLICIT NONE
-      INTEGER N
-      REAL*8,DIMENSION(N,N)::SPIN
-      MAGNETIZATION = SUM(SPIN) / SIZE(SPIN)
-      END
 
 C     SET RANDOM SEED
       SUBROUTINE RND_SEED
@@ -228,18 +226,18 @@ C     SET RANDOM SEED
       END
 
 C     INTIALIZE SPIN
-      SUBROUTINE INIT_ISING(SPIN, N)
+      SUBROUTINE INIT_SG(SPIN, N)
       IMPLICIT NONE
-      INTEGER I, J, N
+      INTEGER X, Y, N
       REAL*8,DIMENSION(N,N)::SPIN
       REAL*8,PARAMETER::EPSILON = 1E-5
 
-      DO J = 1, N
-        DO I= 1,N
-          CALL RANDOM_NUMBER(SPIN(I,J))
-          SPIN(I,J) = NINT(SPIN(I,J))
-          IF (ABS(SPIN(I,J)) < EPSILON) THEN
-            SPIN(I,J) = -1.0
+      DO Y = 1, N
+        DO X = 1, N
+          CALL RANDOM_NUMBER(SPIN(X,Y))
+          SPIN(X,Y) = NINT(SPIN(X,Y))
+          IF (ABS(SPIN(X,Y)) < EPSILON) THEN
+            SPIN(X,Y) = -1.0
           ENDIF
         ENDDO
       ENDDO
@@ -254,10 +252,10 @@ C     INTIALIZE SPIN
       INTEGER COUNT
 
 
-      DO IX = 1, N
-        DO IY = 1, N
-          DO JX = 1, N
-            DO JY = 1, N
+      DO JY = 1, N
+        DO JX = 1, N
+          DO IY = 1, N
+            DO IX = 1, N
               J(IX,IY,JX,JY) = 0
             ENDDO
           ENDDO
@@ -268,6 +266,7 @@ C     INTIALIZE SPIN
       DO
         READ(IN,*,END=100) IX, IY, JX, JY, TMPJ
         J(IX,IY,JX,JY) = TMPJ
+        J(JX,JY,IX,IY) = TMPJ
 C       PRINT *, J(IX,IY,JX,JY)
         COUNT = COUNT + 1
       ENDDO
@@ -289,7 +288,7 @@ C     CHOOSE UPDATED SITE
 
       END
 
-C     UPDATE ISING BASED ON A
+C     UPDATE SPINGLASS BASED ON A
       SUBROUTINE REVERSE_SPIN(SITE_X, SITE_Y, SPIN_A, SPIN_B, N)
       IMPLICIT NONE
       INTEGER N, X,Y
@@ -299,30 +298,16 @@ C     UPDATE ISING BASED ON A
       DO Y = 1, N
         DO X = 1, N
           IF(X == SITE_X .AND. Y == SITE_Y) THEN
-            IF(ABS(SPIN_A(Y,X) - 1.0) < EPSILON) THEN
-              SPIN_B(Y,X) = -1.0
+            IF(ABS(SPIN_A(X,Y) - 1.0) < EPSILON) THEN
+              SPIN_B(X,Y) = -1.0
             ELSE
-              SPIN_B(Y,X) = 1.0
+              SPIN_B(X,Y) = 1.0
             ENDIF
           ELSE
-            SPIN_B(Y,X) = SPIN_A(Y,X)
+            SPIN_B(X,Y) = SPIN_A(X,Y)
           ENDIF
         ENDDO
       ENDDO
-      END
-
-C     REVERSE SPIN OF MOLECULAR ON THE CHOSEN SITE
-      SUBROUTINE UPDATE_ISING(SPIN_A, SPIN_B, N)
-      IMPLICIT NONE
-      INTEGER N,X,Y
-      REAL*8,DIMENSION(N,N)::SPIN_A, SPIN_B
-
-      DO Y = 1, N
-        DO X = 1,N
-          SPIN_A(Y,X) = SPIN_B(Y,X)
-        ENDDO
-      ENDDO
-
       END
 
 C     SET ALPHA
