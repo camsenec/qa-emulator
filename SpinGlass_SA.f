@@ -1,111 +1,68 @@
-!-------------------------------------------------------------------
-! SpinGlass_QA.f: Quantum annealing by the path-integral Monte Carlo method
-!
-!    by Tanaka Tomoya, Kobe University.
-!-------------------------------------------------------------------
-
       PROGRAM ISING2
       IMPLICIT NONE
-
-C     ==========PARAMETER FOR SPINGLASS=========
-C     N : 1スライスにおけるサイト数, QA_STEP : 量子モンテカルロステップ数
-      INTEGER N, QA_STEP
-C     I : 汎用イテレーター, TAU : モンテカルロステップ数, X:スピン配置のX座標, Y:スピン配置のY座標
-      INTEGER I, TAU, X, Y
-C     TMP : 一時的な意味のない値を格納
+      INTEGER N, N_STEP
+      REAL*8 KT_INIT, KT_FIN, ALPHA, SETALPHA, KT
+      INTEGER I, T, X, Y
       INTEGER TMP
-C     SPIN_A(I,;,:): I番目のトロッタースライスの繊維前の状態,  I番目のトロッタースライスのSPIN_B(I,:,:): 遷移したとしたときの状態
-      REAL*8, ALLOCATABLE, DIMENSION(:,:,:) :: SPIN_A, SPIN_B
-C     ENERG : エネルギー計算用サブルーチン, MAGNETIZATION : 磁化計算用サブルーチン
-      REAL*8 ENERG, MAGNETIZATION
-C     ENERG_A(I,:) : I番目のスライスの遷移前のエネルギー, ENERG_B(I,:) : I番目のスライスの遷移後のエネルギー, M(I,:): I番目のスライスの磁化
-      REAL*8, ALLOCATABLE, DIMENSION(:,:) ::ENERG_A, ENERG_B, MAGNETIZATION, M
+C     SPIN_A(:): 繊維前の状態,  SPIN_B(:): 遷移したとしたときの状態
+      REAL*8, ALLOCATABLE, DIMENSION(:,:) :: SPIN_A, SPIN_B
+C     ENERG_A : 繊維前のエネルギー, ENERG_B : 遷移したとしたときのエネルギー, M: 磁化
+      REAL*8 ENERG, ENERG_A, ENERG_B, MAGNETIZATION, M
 C     J : カップリング
       REAL*8, ALLOCATABLE, DIMENSION(:,:,:,:) :: J
-C     P: 反転させる確率, P_BASE : P>P_BASEであるときに反転させる
-      REAL*8 PROB, PROB_BASE
+C     BETA : 1/KT, P: 反転させる確率, P_BASE : P>P_BASEであるときに反転させる
+      REAL*8 BETA, P, P_BASE
 C     SITE_X, SITE_Y : 反転させるサイトのX座標, Y座標
       INTEGER SITE_X, SITE_Y
-C     RESULT_E(I,:), RESULT_M(I,:) : I番目のスライスのDATA_DEVIDE ごとの結果を格納
-      REAL*8, ALLOCATABLE, DIMENSION(:,:)::RESULT_E, RESULT_M
-C     EXPECTED_E(I,:), EXPECTED_M(I,:) : I番目のスライスのDATA_DEVIDE ごとの期待値
+C     EXPECTED_E, EXPECTED_M : DATA_DEVIDE ごとの期待値
       REAL*8 EXPECTED_E, EXPECTED_M
-C     RESULT_EXPECTED(I,:) : I番目のスライスの熱平衡に達したあとの, DATA_DEVIDE ごとの期待値を格納
-      REAL*8, ALLOCATABLE, DIMENSION(:,:)::RESULT_EXPECTED_E,RESULT_EXPECTED_M
-C     EPS : 微小な値
-      REAL * 8,PARAMETER::EPS = 1E-5
-
-C     ========PARAMETER FOR IO==========
+C     RESULT_E, RESULT_M : DATA_DEVIDE ごとの結果を格納
+      REAL*8, ALLOCATABLE::RESULT_E(:), RESULT_M(:)
+C     RESULT_EXPECTED : 熱平衡に達したあとの, DATA_DEVIDE ごとの期待値を格納
+      REAL*8, ALLOCATABLE::RESULT_EXPECTED_E(:),RESULT_EXPECTED_M(:)
+C     EPSILON : 微小な値
+      REAL * 8,PARAMETER::EPSILON = 1E-5
 C     OUT : 書き出しファイルのための装置番号
       INTEGER,PARAMETER::OUT = 17
 C     IN : 読み込みファイルのための装置番号
       INTEGER,PARAMETER::IN = 18
-C     DATA_DEVIDE : DATA_DEVIDEごとに期待値を計算する
+
+      INTEGER DATA_MAX
+CC    SET DATA_DEVIDE!
+C     DATA_DEVIDE : DATA IS RECORDED EVERY @DATA_MAX TRIAL AND EXPECTED VALUE IS CALUCULATED USING @DATA_MAX RESULTS
       INTEGER, PARAMETER::DATA_DEVIDE = 3000
-C     EQUILIBRIUM_POINT : REGARD A STATE AS EQUILIBRIUMU STATE IF TIME IS BIGGER THAN THE VALUE OF THE PARAMETER
+CC    SET EQUILIBRIUM_VALUE!
+C     EQUILIBRIUM_VALUE : REGARD A STATE AS EQUILIBRIUMU STATE IF TIME IS BIGGER THAN THE VALUE OF THE PARAMETER
 C     IT IS SET BY RATE(0 ~ 10)
       INTEGER*8::EQUILIBRIUM_POINT = 3
-C     DATA_MAX : DATA_DEVIDEごとにサンプルを取ったときの, 総サンプル数
-      INTEGER DATA_MAX
-
-C     ========PARAMETER FOR CA(Simulated Annealing)========
-C     REAL*8 KT_INIT, KT_FIN, ALPHA, SETALPHA, KT
-
-C     ========PARAMETER FOR PIQA========
-C     J_TILDA : トロッタースライスごとの相互作用におけるカップリング
-      REAL*8 J_TILDA
-C     GAMMA : アニーリング係数
-      REAL*8 GAMMA
-C     BETA : 逆温度
-      REAL*8 BETA
-C     M : トロッター数
-      INTEGER M
-C     PT : M/BETA
-      REAL*8 PT
-C     TAU_EQ : TAU > TAU_EQのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
-      REAL*8 TAU_EQ
 
 C     ======== INITIALIZE ========
 C     OPEN FILE
+      OPEN(OUT,FILE = 'SpinGlass_SA.dat', STATUS = 'UNKNOWN')
       OPEN(IN, FILE = "SG.dat", STATUS = 'UNKNOWN')
-      OPEN(OUT,FILE = 'SpinGlass_QA.dat', STATUS = 'UNKNOWN')
 
 C     SET RANDOM SEED
       CALL RND_SEED
 
-C     SET PT AND M
-      DO
-        PRINT * , 'M/BETA(1 OR 1.5 OR 2)'
-        READ(*,*) PT
-        IF((ABS(PT-1) < EPS .OR. ABS(PT-1.5) > EPS) .OR. & ABS(PT-2) > EPS) THEN
-          EXIT
-        ENDIF
-      ENDDO
-C     READ M
-      PRINT * 'M'
-      READ(*,*) M
+C     READ N, KT, KT_FIN FROM COMMANDLINE
+      PRINT * , 'N_STEP'
+      READ(*, *) N_STEP
+      PRINT * , 'KT_INIT'
+      READ(*, *) KT_INIT
+C      PRINT * , 'KT_FIN'
+C      READ(*, *) KT_FIN
 
-C     SET BETA
-      BETA = M / PT
-
-C     SET INITIAL GAMMA
-      IF(ABS(PT-1) < EPS) THEN
-        GAMMA = 3
-      ELSE
-        GAMMA = 2.5
-      ENDIF
-
-      DATA_MAX = QA_STEP / DATA_DEVIDE
+      DATA_MAX = N_STEP / DATA_DEVIDE
       EQUILIBRIUM_POINT = INT(DATA_MAX * (EQUILIBRIUM_POINT / 10.0))
 
       READ(IN,*) N
       ALLOCATE(J(N,N,N,N))
-      ALLOCATE(SPIN_A(M,N,N))
-      ALLOCATE(SPIN_B(M,N,N))
-      ALLOCATE(RESULT_E(M,DATA_DEVIDE))
-      ALLOCATE(RESULT_M(M,DATA_DEVIDE))
-      ALLOCATE(RESULT_EXPECTED_E(M,DATA_MAX - EQUILIBRIUM_POINT))
-      ALLOCATE(RESULT_EXPECTED_M(M,DATA_MAX - EQUILIBRIUM_POINT))
+      ALLOCATE(SPIN_A(N,N))
+      ALLOCATE(SPIN_B(N,N))
+      ALLOCATE(RESULT_E(DATA_DEVIDE))
+      ALLOCATE(RESULT_M(DATA_DEVIDE))
+      ALLOCATE(RESULT_EXPECTED_E(DATA_MAX - EQUILIBRIUM_POINT))
+      ALLOCATE(RESULT_EXPECTED_M(DATA_MAX - EQUILIBRIUM_POINT))
 
 C     INITIALIZE OUTPUT FILE
       CALL SPNDAT(-1,SPIN_A,N,ENERG_A)
@@ -124,14 +81,12 @@ C     INITIALIZE SPIN & ENERG_B
 C      PRINT * , ENERG_A
 
       KT = KT_INIT
-      KT_FIN = EPS
-      ALPHA = SETALPHA(KT_INIT,KT_FIN,QA_STEP)
+      KT_FIN = EPSILON
+      ALPHA = SETALPHA(KT_INIT,KT_FIN,N_STEP)
       PRINT * , "ALPHA", ALPHA
 
 C     ======== MONTE-CARLO SIMULATION ========
-C     DO WHILE KT > EPS
-C     QA_STEP = 100
-      DO T = 1, QA_STEP
+      DO T = 1, N_STEP
         IF(KT == 0) THEN
           BETA = 1E5
         ELSE
@@ -240,7 +195,7 @@ C     CALCULATE ENERGY OF GENERAL SITE
           DO JX = 1, N
             DO JY = 1, N
               J_VAL = J(IX, IY, JX, JY)
-              ENERG = ENERG - J_VAL * SPIN(IY, IX) * SPIN(JY, JX)
+              ENERG = ENERG - 1/2.0 * J_VAL * SPIN(IY, IX) * SPIN(JY, JX)
             ENDDO
           ENDDO
         ENDDO
@@ -277,13 +232,13 @@ C     INTIALIZE SPIN
       IMPLICIT NONE
       INTEGER I, J, N
       REAL*8,DIMENSION(N,N)::SPIN
-      REAL*8,PARAMETER::EPS = 1E-5
+      REAL*8,PARAMETER::EPSILON = 1E-5
 
       DO J = 1, N
         DO I= 1,N
           CALL RANDOM_NUMBER(SPIN(I,J))
           SPIN(I,J) = NINT(SPIN(I,J))
-          IF (ABS(SPIN(I,J)) < EPS) THEN
+          IF (ABS(SPIN(I,J)) < EPSILON) THEN
             SPIN(I,J) = -1.0
           ENDIF
         ENDDO
@@ -340,11 +295,11 @@ C     UPDATE ISING BASED ON A
       INTEGER N, X,Y
       INTEGER SITE_X, SITE_Y
       REAL*8,DIMENSION(N,N)::SPIN_A, SPIN_B
-      REAL*8,PARAMETER::EPS = 1E-5
+      REAL*8,PARAMETER::EPSILON = 1E-5
       DO Y = 1, N
         DO X = 1, N
           IF(X == SITE_X .AND. Y == SITE_Y) THEN
-            IF(ABS(SPIN_A(Y,X) - 1.0) < EPS) THEN
+            IF(ABS(SPIN_A(Y,X) - 1.0) < EPSILON) THEN
               SPIN_B(Y,X) = -1.0
             ELSE
               SPIN_B(Y,X) = 1.0
@@ -371,16 +326,16 @@ C     REVERSE SPIN OF MOLECULAR ON THE CHOSEN SITE
       END
 
 C     SET ALPHA
-      DOUBLE PRECISION FUNCTION SETALPHA(KT_INIT, KT_FIN, QA_STEP)
+      DOUBLE PRECISION FUNCTION SETALPHA(KT_INIT, KT_FIN, N_STEP)
       IMPLICIT NONE
       REAL*8 KT_INIT, KT_FIN, X1, X2, X12, F1, F2, F12, CONST
-      INTEGER I, QA_STEP, MAXI
+      INTEGER I, N_STEP, MAXI
 
-      REAL*8,PARAMETER::EPS = 1E-5
+      REAL*8,PARAMETER::EPSILON = 1E-5
 
       MAXI = 10000
 
-      CONST = LOG(KT_FIN / KT_INIT) / REAL(QA_STEP)
+      CONST = LOG(KT_FIN / KT_INIT) / REAL(N_STEP)
 C     PRINT *, "CONST", CONST
 
       X1 = 0.1D0
@@ -396,7 +351,7 @@ C       PRINT * , X12
         F12 = X12 * LOG(X12) - CONST
 C       PRINT * , F12
 
-        IF(ABS(F12) < EPS) THEN
+        IF(ABS(F12) < EPSILON) THEN
           SETALPHA = X12
           RETURN
         ENDIF
@@ -440,7 +395,7 @@ c     T = -1のとき、ファイルの初期化を行う
           DO IX = 1, N
             WRITE(IW,FMT='(I4, I4, 1X, F3.0)') IX, IY, SPIN(IX,IY)
           ENDDO
-          C 改行
+          ! 改行
           WRITE(IW,*)
         ENDDO
         CLOSE(IW)
