@@ -4,31 +4,29 @@
 !    by Tanaka Tomoya, Kobe University.
 !-------------------------------------------------------------------
 
-      PROGRAM ISING2
+      PROGRAM SPIN_GLASS_QA
       IMPLICIT NONE
 
 C     =========Parameter　Declarelation========
 C     ---------Parameter for SpinGlass and General---------
-C     N : 1スライスにおけるサイト数, QA_STEP : 量子モンテカルロステップ数
-      INTEGER N, QA_STEP
+C     N : 1スライスにおけるサイト数
+      INTEGER N
 C     I : 汎用イテレーター, TAU : モンテカルロステップ数, X:スピン配置のX座標, Y:スピン配置のY座標
       INTEGER I, TAU, X, Y
 C     IDX : 一時的なインデックスを格納
       INTEGER IDX
 C     SPIN_OLD(I,;,:): I番目のトロッタースライスの繊維前の状態,  I番目のトロッタースライスのSPIN_NEW(I,:,:): 遷移したとしたときの状態
-      REAL*8, ALLOCATABLE, DIMENSION(:,:,:) :: SPIN_OLD, SPIN_NEW
+      INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: SPIN_OLD, SPIN_NEW
 C     ENERG : エネルギー計算用サブルーチン
       REAL*8 ENERG
 C     ENERG_OLD(I,:) : I番目のスライスの遷移前のエネルギー, ENERG_NEW(I,:) : I番目のスライスの遷移後のエネルギー, M(I,:): I番目のスライスの磁化
-      REAL*8, ALLOCATABLE, DIMENSION(:,:) ::ENERG_OLD, ENERG_NEW, M
+      REAL*8, ALLOCATABLE::ENERG_OLD(:), ENERG_NEW(:)
 C     J : カップリング
       REAL*8, ALLOCATABLE, DIMENSION(:,:,:,:) :: J
 C     P: 反転させる確率, P_BASE : P>P_BASEであるときに反転させる
       REAL*8 PROB, PROB_BASE
 C     SITE_X, SITE_Y : 反転させるサイトのX座標, Y座標
       INTEGER SITE_X, SITE_Y
-C     RESULT_E(I,:), RESULT_M(I,:) : 各スライスのエネルギーを格納
-      REAL*8, ALLOCATABLE::RESULT_E(:), RESULT_M(:)
 C     EPS : 微小な値
       REAL * 8,PARAMETER::EPS = 1E-5
 
@@ -39,10 +37,16 @@ C     IN : 読み込みファイルのための装置番号
       INTEGER,PARAMETER::IN = 18
 
 C     --------Parameter for SA(Simulated Annealing)--------
-      REAL*8,PARAMETER::KT_INIT = 3,
+C     SA_STEP : SAのステップ数
+      INTEGER SA_STEP
+C     KT_INIT : 初期温度
+      REAL*8,PARAMETER::KT_INIT = 5
+C     KT_FIN : 最終温度
       REAL*8 KT_FIN,KT
 
 C     --------Parameter for QA--------
+C     QA_STEP : 量子モンテカルロステップ数
+      INTEGER QA_STEP
 C     J_TILDA : トロッタースライスごとの相互作用におけるカップリング
       REAL*8 J_TILDA
 C     GAMMA : アニーリング係数
@@ -50,11 +54,13 @@ C     GAMMA : アニーリング係数
 C     BETA : 逆温度
       REAL*8 BETA
 C     M : トロッター数, K : 各スライス
-      INTEGER M,K
+      INTEGER M, K
 C     PT : M/BETA
       REAL*8 PT
 C     TAU_EQ : TAU > TAU_EQのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
       REAL*8 TAU_EQ
+
+
 
 C     ======== Initialize ========
 C     -------- Initialie for IO-------
@@ -67,12 +73,13 @@ C     Set PT and M
       DO
         PRINT * , 'M/BETA(1 OR 1.5 OR 2)'
         READ(*,*) PT
-        IF((ABS(PT-1) < EPS .OR. ABS(PT-1.5) > EPS) .OR. & ABS(PT-2) > EPS) THEN
+        IF((ABS(PT-1) < EPS .OR. ABS(PT-1.5) < EPS) .OR.
+     &(ABS(PT-2) < EPS)) THEN
           EXIT
         ENDIF
       ENDDO
 C     READ M
-      PRINT * 'M'
+      PRINT * ,'M'
       READ(*,*) M
 
 C     Set BETA(becaues PT = M * (1 / BETA))
@@ -93,7 +100,7 @@ C     Set KT
       KT = KT_INIT
       PRINT *, KT_INIT
 C     Set SA_STEP
-      SA_STEP = (KT_INIT - KT_FIN) / 0.05
+      SA_STEP = (KT_INIT - KT_FIN) / 0.05 + 1
       PRINT *,SA_STEP
 
 C     -------- Initialize for SpinGlass and General------
@@ -105,7 +112,8 @@ C     allocate
       ALLOCATE(J(N,N,N,N))
       ALLOCATE(SPIN_OLD(N,N,M))
       ALLOCATE(SPIN_NEW(N,N,M))
-      ALLOCATE(RESULT_E(M))
+      ALLOCATE(ENERG_OLD(M))
+      ALLOCATE(ENERG_NEW(M))
 
 C     Initialize spin of all slice
       CALL INIT_SG(SPIN_OLD,M,N)
@@ -115,51 +123,50 @@ C     Initialize coupling
 
 C     Initialize ENERG_OLD of all slice
       DO K =  1, M
-        ENERG_OLD = ENERG(J, SPIN_OLD, K, M, N)
+        ENERG_OLD(K) = ENERG(J, SPIN_OLD, K, M, N)
       ENDDO
 
 C     Initialize output file for animation
 C     CALL SPNDAT(-1,SPIN_OLD,K,N,MENERG_OLD)
 
+
+
 C     ======== Preannealing with SA ========
-      DO I = 1, SA_STEP
+      DO I = 1,SA_STEP
 C       100 MC steps per spin
         DO TAU = 1,100
 C         MC on each slice
           DO K = 1, M
-
 C           Select reversed site
             CALL CHOOSE(SITE_X, SITE_Y, N)
 C           Reverse spin
-            CALL REVERSE_SPIN(SITE_X, SITE_Y, SPIN_OLD, SPIN_NEW, K, M, N)
+            CALL REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
 C　　         Calculate ENERG_NEW
-            ENERG_NEW = ENERG(J, SPIN_NEW, K, M, N)
+            ENERG_NEW(K) = ENERG(J, SPIN_NEW, K, M, N)
 
 C　         Calculate P
 C　         PRINT * , 'TAU',TAU, 'ENERG_NEW', ENERG_NEW , 'ENERG_OLD', ENERG_OLD
-            IF (ENERG_NEW - ENERG_OLD <= 0) THEN
-              P = 1
+            IF (ENERG_NEW(K) - ENERG_OLD(K) <= 0) THEN
+              PROB = 1
             ELSE
-              P = EXP(-(1/KT) * (ENERG_NEW - ENERG_OLD))
+              PROB = EXP(-(1/KT) * (ENERG_NEW(K) - ENERG_OLD(K)))
             ENDIF
 
 C　         Update SG based on probability P
-            CALL RANDOM_NUMBER(P_BASE)
+            CALL RANDOM_NUMBER(PROB_BASE)
 
-            IF (P >= P_BASE) THEN
-              SPIN_OLD = SPIN_NEW
-              ENERG_OLD = ENERG_NEW
+            IF (PROB >= PROB_BASE) THEN
+              CALL UPDATE_SG(SPIN_OLD, SPIN_NEW, K, M, N)
+              ENERG_OLD(K) = ENERG_NEW(K)
             ENDIF
-
-            RESULT_E(K) = ENERG_OLD
           ENDDO
-
         ENDDO
 
 C       Output energy of each slice
         DO K = 1, M
-          PRINT *, KT , RESULT(K)
+          PRINT *, KT , ENERG_OLD(K)
         ENDDO
+        WRITE(*,*)
 
 C       Update temperature
         KT = KT - 0.05
@@ -168,8 +175,9 @@ C       Update temperature
 
       DEALLOCATE(J)
       DEALLOCATE(SPIN_OLD,SPIN_NEW)
-      DEALLOCATE(RESULT_E)
-      CLOSE(IN,OUT)
+      DEALLOCATE(ENERG_OLD,ENERG_NEW)
+      CLOSE(IN)
+      CLOSE(OUT)
       END
 
 
@@ -183,10 +191,10 @@ C     Calculate energy of a slice
 
       ENERG = 0.0D0
 
-      DO IX = 1, N
-        DO IY = 1, N
-          DO JX = 1, N
-            DO JY = 1, N
+      DO JY = 1, N
+        DO JX = 1, N
+          DO IY = 1, N
+            DO IX = 1, N
               J_VAL = J(IX, IY, JX, JY)
               ENERG = ENERG - 1/2.0 * J_VAL * SPIN(IX, IY, K)
      &* SPIN(JX, JY, K)
@@ -219,15 +227,16 @@ C     Set random seed
 C     Initialize SpinGlass
       SUBROUTINE INIT_SG(SPIN, M, N)
       IMPLICIT NONE
-      INTEGER X, Y, M, N
+      INTEGER X, Y, K, M, N
       INTEGER,DIMENSION(N,N,M)::SPIN
+      REAL*8 TMP
       REAL*8,PARAMETER::EPS = 1E-5
 
       DO K = 1, M
         DO Y = 1, N
           DO X = 1, N
-            CALL RANDOM_NUMBER(SPIN(X,Y,K))
-            SPIN(X,Y,K) = NINT(SPIN(X,Y,K))
+            CALL RANDOM_NUMBER(TMP)
+            SPIN(X,Y,K) = NINT(TMP)
             IF (ABS(SPIN(K,X,Y)) < EPS) THEN
               SPIN(X,Y,K) = -1.0
             ENDIF
@@ -246,10 +255,10 @@ C     Initialize coupling
       INTEGER IN
       INTEGER COUNT
 
-      DO IX = 1, N
-        DO IY = 1, N
-          DO JX = 1, N
-            DO JY = 1, N
+      DO JY = 1, N
+        DO JX = 1, N
+          DO IY = 1, N
+            DO IX = 1, N
               J(IX,IY,JX,JY) = 0
             ENDDO
           ENDDO
@@ -285,7 +294,7 @@ C     Choose update site
 
 
 C     Reverse spin based on SPIN_OLD
-      SUBROUTINE REVERSE_SPIN(SITE_X, SITE_Y, SPIN_OLD, SPIN_NEW, K, M, N)
+      SUBROUTINE REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
       IMPLICIT NONE
       INTEGER M, N, K, X, Y
       INTEGER SITE_X, SITE_Y
@@ -298,6 +307,20 @@ C     Reverse spin based on SPIN_OLD
       ELSE
         SPIN_NEW(SITE_X,SITE_Y,K) = -1
       ENDIF
+      END
+
+C     UPDATE SG BASED ON SPIN_OLD
+      SUBROUTINE UPDATE_SG(SPIN_OLD, SPIN_NEW, K, M, N)
+      IMPLICIT NONE
+      INTEGER N,M,K,X,Y
+      INTEGER,DIMENSION(N,N,M)::SPIN_OLD, SPIN_NEW
+
+      DO Y = 1, N
+        DO X = 1,N
+          SPIN_OLD(X,Y,K) = SPIN_NEW(X,Y,K)
+        ENDDO
+      ENDDO
+
       END
 
 C     Output data for animation
