@@ -9,4 +9,12 @@ module constants_m
 
   ! << Mathematical constants >
   real(DR), parameter :: EPS = 1e5
+
+  ! <<IO constants >
+  ! in : 読み込みファイルのための装置番号
+  integer(SI),parameter :: in = 17
+  ! in2 : 読み込みファイルのための装置番号
+  integer(SI),parameter :: in2 = 18
+  
+
 end module constants_m
