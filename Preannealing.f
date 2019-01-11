@@ -19,10 +19,8 @@ C     SPIN_OLD(I,;,:): I番目のトロッタースライスの繊維前の状�
       INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: SPIN_OLD, SPIN_NEW
 C     ENERG : エネルギー計算用サブルーチン
       REAL*8 ENERG
-C     ENERG_OLD(I,:) : I番目のスライスの遷移前のエネルギー, ENERG_NEW(I,:) : I番目のスライスの遷移後のエネルギー
+C     ENERG_OLD(I,:) : I番目のスライスの遷移前のエネルギー, ENERG_NEW(I,:) : I番目のスライスの遷移後のエネルギー, M(I,:): I番目のスライスの磁化
       REAL*8, ALLOCATABLE::ENERG_OLD(:), ENERG_NEW(:)
-C     ENERG_OLD_QA : 遷移前のエネルギー, ENERG_NEW_QA : 遷移後のエネルギ-
-      REAL*8, ALLOCATABLE::ENERG_OLD_QA, ENERG_NEW_QA
 C     J : カップリング
       REAL*8, ALLOCATABLE, DIMENSION(:,:,:,:) :: J
 C     P: 反転させる確率, P_BASE : P>P_BASEであるときに反転させる
@@ -42,7 +40,7 @@ C     --------Parameter for SA(Simulated Annealing)--------
 C     SA_STEP : SAのステップ数
       INTEGER SA_STEP
 C     KT_INIT : 初期温度
-      REAL*8,PARAMETER::KT_INIT = 3
+      REAL*8,PARAMETER::KT_INIT = 5
 C     KT_FIN : 最終温度
       REAL*8 KT_FIN,KT
 
@@ -68,7 +66,7 @@ C     ======== Initialize ========
 C     -------- Initialie for IO-------
 C     Open file
       OPEN(IN, FILE = "SG.dat", STATUS = 'UNKNOWN')
-      OPEN(OUT,FILE = 'Spin.dat', STATUS = 'UNKNOWN')
+      OPEN(OUT,FILE = 'Spin.dat', STATUS = 'REPLACE')
 
 C     -------- Initialize For QA ------
 C     Set PT and M
@@ -103,6 +101,7 @@ C     Set KT
       PRINT *, KT_INIT
 C     Set SA_STEP
       SA_STEP = (KT_INIT - KT_FIN + EPS) / 0.05 + 1
+      SA_STEP = 300
       PRINT *,SA_STEP
 
 C     -------- Initialize for SpinGlass and General------
@@ -131,6 +130,8 @@ C     Initialize ENERG_OLD of all slice
 C     Initialize output file for animation
 C     CALL SPNDAT(-1,SPIN_OLD,K,N,MENERG_OLD)
 
+
+
 C     ======== Preannealing with SA ========
       DO I = 1,SA_STEP
 C       100 MC steps per spin
@@ -142,7 +143,7 @@ C           Select reversed site
 C           Reverse spin
             CALL REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
 C　　         Calculate ENERG_NEW
-            ENERG_NEW(K) = ENERG_SA(J, SPIN_NEW, K, M, N)
+            ENERG_NEW(K) = ENERG(J, SPIN_NEW, K, M, N)
 
 C　         Calculate P
 C　         PRINT * , 'TAU',TAU, 'ENERG_NEW', ENERG_NEW , 'ENERG_OLD', ENERG_OLD
@@ -169,56 +170,19 @@ C       Output energy of each slice
         WRITE(*,*)
 
 C       Update temperature
-        KT = KT - 0.05
+        KT = KT_INIT * 0.9999**(I*100)
 
       ENDDO
 
-C     ======== Quantumn Annealing ========
-      DO I = 1, QA_STEP
-C     Calculate J_TILDA
-      J_TILDA = -1 / BETA * LOG(TANH(BETA * GAMMA / M))
-C     Calculate ENERG_OLD_QA
-      ENERG_OLD_QA = ENERG_QA(J, SPIN_OLD, J_TILDA, M, N)
-
-C       MC on each slice
-        DO K = 1, M
-          DO SITE_X = 1, N
-            DO SITE_Y = 1, N
-
-C             Reverse spin
-              CALL REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
-
-C             Calculate ENERG_NEW
-              ENERG_NEW = ENERG_QA(J, SPIN_NEW, J_TILDA, M, N)
-
-C             Calculate P
-C             PRINT * , 'TAU',TAU, 'ENERG_NEW', ENERG_NEW , 'ENERG_OLD', ENERG_OLD
-              IF (ENERG_NEW - ENERG_OLD <= 0) THEN
-                PROB = 1
-              ELSE
-                PROB = EXP(-(1/KT) * (ENERG_NEW_QA - ENERG_OLD))
-              ENDIF
-
-C             Update SG based on probability P
-              CALL RANDOM_NUMBER(PROB_BASE)
-
-              IF (PROB >= PROB_BASE) THEN
-                CALL UPDATE_SG(SPIN_OLD_QA, SPIN_NEW_QA, K, M, N)
-                ENERG_OLD_QA = ENERG_NEW_QA
-              ENDIF
-            ENDDO
+C     -------- output spin -------
+      DO K = 1,M
+        DO Y = 1,N
+          DO X = 1,N
+            WRITE(OUT,FMT='(I4, I4, I4, 1X, I4)') X, Y,
+     &K, SPIN_OLD(X,Y,K)
           ENDDO
         ENDDO
-
-C       Output energy of each slice
-        DO K = 1, M
-          PRINT *, KT , ENERG_OLD(K)
-        ENDDO
-        WRITE(*,*)
-
-C       Update GAMMA
-        GAMMMA = GAMMA - 0.05
-
+        WRITE(OUT,*)
       ENDDO
 
       DEALLOCATE(J)
@@ -229,10 +193,11 @@ C       Update GAMMA
       END
 
 
-C     Calculate energy of a slice on SA
-      DOUBLE PRECISION FUNCTION ENERG_SA(J, SPIN, K, M, N)
+C     Calculate energy of a slice
+      DOUBLE PRECISION FUNCTION ENERG(J, SPIN, K, M, N)
       IMPLICIT NONE
       REAL*8 J(N,N,N,N)
+      REAL*8 J_VAL
       INTEGER,DIMENSION(N,N,M)::SPIN
       INTEGER M, N, K, IX, IY, JX, JY
 
@@ -242,60 +207,14 @@ C     Calculate energy of a slice on SA
         DO JX = 1, N
           DO IY = 1, N
             DO IX = 1, N
-              ENERG_SA = ENERG_SA - 1/2.0 * J(IX,IY,JX,JY)
-     &* SPIN(IX, IY, K) * SPIN(JX, JY, K)
+              J_VAL = J(IX, IY, JX, JY)
+              ENERG = ENERG - 1/2.0 * J_VAL * SPIN(IX, IY, K)
+     &* SPIN(JX, JY, K)
             ENDDO
           ENDDO
         ENDDO
       ENDDO
 
-      END
-
-C     Calculate average of energy of all replica in QA
-      DOUBLE PRECISION FUNCTION ENERG_QA(J, SPIN, J_TILDA, M, N)
-      IMPLICIT NONE
-      REAL*8 J(N,N,N,N)
-      REAL*8 J_TILDA
-      REAL*8,ALLOCATABLE::ENERG_0(:), ENERG_1(:)
-      INTEGER,DIMENSION(N,N,M)::SPIN
-      INTEGER M, N, K, IX, IY, JX, JY
-
-      ALLOCATE(ENERG_0(M))
-      ALLOCATE(ENERG_1(M))
-
-      DO K = 1, M
-        ENERG_0(K) = 0.0D0
-        ENERG_1(K) = 0.0D0
-      ENDDO
-
-      DO K = 1, M
-        DO JY = 1, N
-          DO JX = 1, N
-            DO IY = 1, N
-              DO IX = 1, N
-                ENERG_0(K) = ENERG_0(K) - 1/2.0 * J(IX,IY,JX,JY)
-     &* SPIN(IX, IY, K) * SPIN(JX, JY, K)
-              ENDDO
-            ENDDO
-          ENDDO
-        ENDDO
-      ENDDO
-
-      DO K = 1,M-1
-        DO IY = 1, N
-          DO IX = 1, N
-            ENERG_1(K) = ENERG_1(K) - SPIN(IX,IY,K) * SPIN(IX,IY,K+1)
-          ENDDO
-        ENDDO
-      ENDDO
-
-      DO IY = 1, N
-        DO IX = 1, N
-          ENERG_1(M) = ENERG_1(M) - SPIN(IX,IY,M) * SPIN(IX,IY,1)
-        ENDDO
-      ENDDO
-
-      ENERG_QA = SUM(ENERG_0) / DBLE(M) - J_TILDA * SUM(ENERG_1)
       END
 
 

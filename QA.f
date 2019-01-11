@@ -4,7 +4,7 @@
 !    by Tanaka Tomoya, Kobe University.
 !-------------------------------------------------------------------
 
-      PROGRAM SPIN_GLASS_QA
+      PROGRAM QUANTUMANNEALING
       IMPLICIT NONE
 
 C     =========Parameter　Declarelation========
@@ -13,12 +13,14 @@ C     N : 1スライスにおけるサイト数
       INTEGER N
 C     I : 汎用イテレーター, TAU : モンテカルロステップ数, X:スピン配置のX座標, Y:スピン配置のY座標
       INTEGER I, TAU, X, Y
-C     IDX : 一時的なインデックスを格納
-      INTEGER IDX
+C     IDX : 一時的なインデックスを格納, COUNT : 汎用カウンタ
+      INTEGER IDX, COUNT
+C     TMP : 一時的な値を格納
+      INTEGER TMP
 C     SPIN_OLD(I,;,:): I番目のトロッタースライスの繊維前の状態,  I番目のトロッタースライスのSPIN_NEW(I,:,:): 遷移したとしたときの状態
       INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: SPIN_OLD, SPIN_NEW
-C     ENERG : エネルギー計算用サブルーチン
-      REAL*8 ENERG
+C     ENERG_SA, ENERG_QA : エネルギー計算用関数, DELTA_QA : エネルギー差計算用関数
+      REAL*8 ENERG_SA, ENERG_QA, DELTA_QA, DELTA
 C     ENERG_OLD(I,:) : I番目のスライスの遷移前のエネルギー, ENERG_NEW(I,:) : I番目のスライスの遷移後のエネルギー
       REAL*8, ALLOCATABLE::ENERG_OLD(:), ENERG_NEW(:)
 C     ENERG_OLD_QA : 遷移前のエネルギー, ENERG_NEW_QA : 遷移後のエネルギ-
@@ -33,18 +35,10 @@ C     EPS : 微小な値
       REAL * 8,PARAMETER::EPS = 1E-5
 
 C     --------Parameter for IO--------
-C     OUT : 書き出しファイルのための装置番号
-      INTEGER,PARAMETER::OUT = 17
-C     IN : 読み込みファイルのための装置番号
-      INTEGER,PARAMETER::IN = 18
-
-C     --------Parameter for SA(Simulated Annealing)--------
-C     SA_STEP : SAのステップ数
-      INTEGER SA_STEP
-C     KT_INIT : 初期温度
-      REAL*8,PARAMETER::KT_INIT = 3
-C     KT_FIN : 最終温度
-      REAL*8 KT_FIN,KT
+C     IN : 読み出しファイルのための装置番号
+      INTEGER,PARAMETER::IN = 17
+C     IN2 : 読み込みファイルのための装置番号
+      INTEGER,PARAMETER::IN2 = 18
 
 C     --------Parameter for QA--------
 C     QA_STEP : 量子モンテカルロステップ数
@@ -52,7 +46,7 @@ C     QA_STEP : 量子モンテカルロステップ数
 C     J_TILDA : トロッタースライスごとの相互作用におけるカップリング
       REAL*8 J_TILDA
 C     GAMMA : アニーリング係数
-      REAL*8 GAMMA
+      REAL*8 GAMMA, GAMMA_INIT
 C     BETA : 逆温度
       REAL*8 BETA
 C     M : トロッター数, K : 各スライス
@@ -62,15 +56,13 @@ C     PT : M/BETA
 C     TAU_EQ : TAU > TAU_EQのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
       REAL*8 TAU_EQ
 
-
-
 C     ======== Initialize ========
 C     -------- Initialie for IO-------
 C     Open file
       OPEN(IN, FILE = "SG.dat", STATUS = 'UNKNOWN')
-      OPEN(OUT,FILE = 'Spin.dat', STATUS = 'UNKNOWN')
+      OPEN(IN2,FILE = 'Spin.dat', STATUS = 'UNKNOWN')
 
-C     -------- Initialize For QA ------
+C     -------- Initialize For QA(rf. Roman Martonak et al.)------
 C     Set PT and M
       DO
         PRINT * , 'M/BETA(1 OR 1.5 OR 2)'
@@ -80,37 +72,43 @@ C     Set PT and M
           EXIT
         ENDIF
       ENDDO
+
 C     READ M
-      PRINT * ,'M'
+      PRINT *, 'M'
       READ(*,*) M
 
-C     Set BETA(becaues PT = M * (1 / BETA))
+C     Set BETA(becaues PT = M  / BETA))
       BETA = M / PT
 
 C     Set initial GAMMA
       IF(ABS(PT-1) < EPS) THEN
-        GAMMA = 3
+        GAMMA_INIT = 3
       ELSE
-        GAMMA = 2.5
+        GAMMA_INIT = 2.5
       ENDIF
 
-C     -------- Initialize For SA(preannealing) ------
-C     Set T_FIN
-      KT_FIN = 1.0 / BETA
-      PRINT *, KT_FIN
-C     Set KT
-      KT = KT_INIT
-      PRINT *, KT_INIT
-C     Set SA_STEP
-      SA_STEP = (KT_INIT - KT_FIN + EPS) / 0.05 + 1
-      PRINT *,SA_STEP
+C     set N
+      READ(IN,*) N
+
+C     -------- Parameter Reset ------
+C     reset BETA(KT = 0.1)
+!      BETA = 10
+C     reset initial GAMMA
+!      GAMMA_INIT = 1
+C     set GAMMA and QA_STEP
+
+      GAMMA = GAMMA_INIT
+      QA_STEP = 500000 / N*N
+
+      PRINT *,'BETA:', BETA
+      PRINT *,'INITIAL_GAMMA:', GAMMA_INIT
+      PRINT *, 'QA_STEP:', QA_STEP
 
 C     -------- Initialize for SpinGlass and General------
 C     Set random seed
       CALL RND_SEED
 
 C     allocate
-      READ(IN,*) N
       ALLOCATE(J(N,N,N,N))
       ALLOCATE(SPIN_OLD(N,N,M))
       ALLOCATE(SPIN_NEW(N,N,M))
@@ -123,87 +121,59 @@ C     Initialize spin of all slice
 C     Initialize coupling
       CALL INIT_COUPLING(J,N,IN)
 
-C     Initialize ENERG_OLD of all slice
-      DO K =  1, M
-        ENERG_OLD(K) = ENERG(J, SPIN_OLD, K, M, N)
-      ENDDO
+!     ======== Preannealing with SA ========
+!      DO
+!        READ(IN2,*,END=100) X, Y, K, TMP
+!        SPIN_OLD(X,Y,K) = TMP
+!        COUNT = COUNT + 1
+!      ENDDO
+!  100 CLOSE(IN2)
 
-C     Initialize output file for animation
-C     CALL SPNDAT(-1,SPIN_OLD,K,N,MENERG_OLD)
+!      DO K =  1, M
+!        ENERG_OLD(K) = ENERG_SA(J, SPIN_OLD, K, M, N)
+!      ENDDO
 
-C     ======== Preannealing with SA ========
-      DO I = 1,SA_STEP
-C       100 MC steps per spin
-        DO TAU = 1,100
-C         MC on each slice
-          DO K = 1, M
-C           Select reversed site
-            CALL CHOOSE(SITE_X, SITE_Y, N)
-C           Reverse spin
-            CALL REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
-C　　         Calculate ENERG_NEW
-            ENERG_NEW(K) = ENERG_SA(J, SPIN_NEW, K, M, N)
-
-C　         Calculate P
-C　         PRINT * , 'TAU',TAU, 'ENERG_NEW', ENERG_NEW , 'ENERG_OLD', ENERG_OLD
-            IF (ENERG_NEW(K) - ENERG_OLD(K) <= 0) THEN
-              PROB = 1
-            ELSE
-              PROB = EXP(-(1/KT) * (ENERG_NEW(K) - ENERG_OLD(K)))
-            ENDIF
-
-C　         Update SG based on probability P
-            CALL RANDOM_NUMBER(PROB_BASE)
-
-            IF (PROB >= PROB_BASE) THEN
-              CALL UPDATE_SG(SPIN_OLD, SPIN_NEW, K, M, N)
-              ENERG_OLD(K) = ENERG_NEW(K)
-            ENDIF
-          ENDDO
-        ENDDO
-
-C       Output energy of each slice
-        DO K = 1, M
-          PRINT *, KT , ENERG_OLD(K)
-        ENDDO
-        WRITE(*,*)
-
-C       Update temperature
-        KT = KT - 0.05
-
-      ENDDO
+C     Output energy of each slice
+!      DO K = 1, M
+!        PRINT *, ENERG_OLD(K)
+!      ENDDO
+      WRITE(*,*)
 
 C     ======== Quantumn Annealing ========
       DO I = 1, QA_STEP
-C     Calculate J_TILDA
-      J_TILDA = -1 / BETA * LOG(TANH(BETA * GAMMA / M))
-C     Calculate ENERG_OLD_QA
-      ENERG_OLD_QA = ENERG_QA(J, SPIN_OLD, J_TILDA, M, N)
+C       Calculate J_TILDA
+        J_TILDA = -1 / (2 * BETA) * LOG(TANH(BETA * GAMMA / M))
+        PRINT *, 'J_TILDA', J_TILDA
+C       Calculate ENERG_OLD_QA based on J_TILDA
+        ENERG_OLD_QA = ENERG_QA(J, SPIN_OLD, J_TILDA, M, N)
 
 C       MC on each slice
         DO K = 1, M
-          DO SITE_X = 1, N
-            DO SITE_Y = 1, N
+          DO X = 1,N
+            DO Y = 1,N
+C             Select reversed site
+              CALL CHOOSE(SITE_X, SITE_Y, N)
 
 C             Reverse spin
               CALL REVERSE_SPIN(SITE_X,SITE_Y,SPIN_OLD,SPIN_NEW,K,M,N)
 
 C             Calculate ENERG_NEW
-              ENERG_NEW = ENERG_QA(J, SPIN_NEW, J_TILDA, M, N)
+              DELTA = DELTA_QA(J,SPIN_NEW,J_TILDA,SITE_X,SITE_Y,K,M,N)
+              ENERG_NEW_QA = ENERG_OLD_QA + DELTA
+C             PRINT *,  TAU, ENERG_OLD_QA , ENERG_NEW_QA
 
 C             Calculate P
-C             PRINT * , 'TAU',TAU, 'ENERG_NEW', ENERG_NEW , 'ENERG_OLD', ENERG_OLD
-              IF (ENERG_NEW - ENERG_OLD <= 0) THEN
+              IF (DELTA <= 0) THEN
                 PROB = 1
               ELSE
-                PROB = EXP(-(1/KT) * (ENERG_NEW_QA - ENERG_OLD))
+                PROB = EXP(-BETA * DELTA)
               ENDIF
 
 C             Update SG based on probability P
               CALL RANDOM_NUMBER(PROB_BASE)
 
               IF (PROB >= PROB_BASE) THEN
-                CALL UPDATE_SG(SPIN_OLD_QA, SPIN_NEW_QA, K, M, N)
+                SPIN_OLD = SPIN_NEW
                 ENERG_OLD_QA = ENERG_NEW_QA
               ENDIF
             ENDDO
@@ -211,13 +181,17 @@ C             Update SG based on probability P
         ENDDO
 
 C       Output energy of each slice
+        DO K =  1, M
+          ENERG_OLD(K) = ENERG_SA(J, SPIN_OLD, K, M, N)
+        ENDDO
+
         DO K = 1, M
-          PRINT *, KT , ENERG_OLD(K)
+          PRINT *, GAMMA , ENERG_OLD(K)
         ENDDO
         WRITE(*,*)
 
 C       Update GAMMA
-        GAMMMA = GAMMA - 0.05
+        GAMMA = 0.99*GAMMA
 
       ENDDO
 
@@ -225,7 +199,7 @@ C       Update GAMMA
       DEALLOCATE(SPIN_OLD,SPIN_NEW)
       DEALLOCATE(ENERG_OLD,ENERG_NEW)
       CLOSE(IN)
-      CLOSE(OUT)
+      CLOSE(IN2)
       END
 
 
@@ -236,7 +210,7 @@ C     Calculate energy of a slice on SA
       INTEGER,DIMENSION(N,N,M)::SPIN
       INTEGER M, N, K, IX, IY, JX, JY
 
-      ENERG = 0.0D0
+      ENERG_SA = 0.0D0
 
       DO JY = 1, N
         DO JX = 1, N
@@ -294,10 +268,43 @@ C     Calculate average of energy of all replica in QA
           ENERG_1(M) = ENERG_1(M) - SPIN(IX,IY,M) * SPIN(IX,IY,1)
         ENDDO
       ENDDO
+C      PRINT *, "ENERG_1", SUM(ENERG_0) / SIZE(ENERG_0)
+C      PRINT *, "ENERG_2", J_TILDA * SUM(ENERG_1)
 
-      ENERG_QA = SUM(ENERG_0) / DBLE(M) - J_TILDA * SUM(ENERG_1)
+      ENERG_QA = SUM(ENERG_0) / SIZE(ENERG_0) + J_TILDA * SUM(ENERG_1)
       END
 
+      REAL*8 FUNCTION DELTA_QA(J,SPIN,J_TILDA,SITE_X,SITE_Y,K,M,N)
+      IMPLICIT NONE
+      REAL*8 J(N,N,N,N), J_TILDA
+      INTEGER SPIN(N,N,N)
+      INTEGER SITE_X, SITE_Y, X, Y, K, N, M
+      REAL*8 DELTA_ENERG_0, DELTA_ENERG_1
+
+      DELTA_ENERG_0 = 0.0D0
+      DELTA_ENERG_1 = 0.0D0
+
+        DO Y = 1, N
+          DO X = 1, N
+            DELTA_ENERG_0 = DELTA_ENERG_0 - (1/2.0) *
+     &J(X, Y, SITE_X, SITE_Y) * SPIN(X, Y, K) * SPIN(SITE_X, SITE_Y, K)
+
+            DELTA_ENERG_0 = DELTA_ENERG_0 - (1/2.0) *
+     &J(SITE_X, SITE_Y, X, Y) * SPIN(X, Y, K) * SPIN(SITE_X, SITE_Y, K)
+          ENDDO
+        ENDDO
+
+      IF(K == M) THEN
+        DELTA_ENERG_1 = DELTA_ENERG_1 - SPIN(SITE_X,SITE_Y,M) *
+     &SPIN(SITE_X,SITE_Y,1)
+      ELSE
+        DELTA_ENERG_1 = DELTA_ENERG_1 - SPIN(SITE_X,SITE_Y,K) *
+     &SPIN(SITE_X,SITE_Y,K+1)
+      ENDIF
+
+      DELTA_QA = 2 * ((DELTA_ENERG_0 / M) + (J_TILDA * DELTA_ENERG_1))
+
+      END
 
 C     Set random seed
       SUBROUTINE RND_SEED
@@ -348,16 +355,7 @@ C     Initialize coupling
       INTEGER IN
       INTEGER COUNT
 
-      DO JY = 1, N
-        DO JX = 1, N
-          DO IY = 1, N
-            DO IX = 1, N
-              J(IX,IY,JX,JY) = 0
-            ENDDO
-          ENDDO
-        ENDDO
-      ENDDO
-
+      J = 0
 
       DO
         READ(IN,*,END=100) IX, IY, JX, JY, TMPJ
@@ -399,62 +397,5 @@ C     Reverse spin based on SPIN_OLD
         SPIN_NEW(SITE_X,SITE_Y,K) = 1
       ELSE
         SPIN_NEW(SITE_X,SITE_Y,K) = -1
-      ENDIF
-      END
-
-C     UPDATE SG BASED ON SPIN_OLD
-      SUBROUTINE UPDATE_SG(SPIN_OLD, SPIN_NEW, K, M, N)
-      IMPLICIT NONE
-      INTEGER N,M,K,X,Y
-      INTEGER,DIMENSION(N,N,M)::SPIN_OLD, SPIN_NEW
-
-      DO Y = 1, N
-        DO X = 1,N
-          SPIN_OLD(X,Y,K) = SPIN_NEW(X,Y,K)
-        ENDDO
-      ENDDO
-
-      END
-
-C     Output data for animation
-      SUBROUTINE SPNDAT(TAU,SPIN,K,M,N,EN)
-      IMPLICIT NONE
-      CHARACTER*10 NAM
-      INTEGER TAU,IX, IY,K, M, N
-      INTEGER SPIN(N,N,M)
-      INTEGER EN
-      INTEGER, PARAMETER::IW = 5000
-c
-c     スピン配置SPINを行列の形で外部ファイルspin.datに書き出す
-c     サイトの平均エネルギーENを外部ファイルen.datに書き出す
-c
-c
-c     TAU (INTEGER)        : 現在I回目の呼び出し(I番目のスピン配置とエネルギーに
-c                          ついてデータを書き足す)
-c     SPIN(N,N) (REAL*8) : I番目のx,y座標のスピンの情報, SPIN(x,y) = 1.0d0 or -1.0d0
-c     N (INTEGER)        : 二次元イジングの一辺のサイト数(合計スピン数はN*N)
-c     EN (REAL*8)        : I番目のスピン配置に対応するエネルギー
-
-c     TAU = -1のとき、ファイルの初期化を行う
-      IF(TAU.EQ.-1) THEN
-        OPEN(IW,FILE="spin.dat",STATUS="REPLACE")
-        CLOSE(IW)
-        OPEN(IW,FILE="en.dat",STATUS="REPLACE")
-        WRITE(IW,*) "# Time        Energy"
-        CLOSE(IW)
-      ELSE
-        OPEN(IW,FILE="spin.dat",STATUS="OLD",POSITION="APPEND")
-        DO IY = 1, N
-          DO IX = 1, N
-            WRITE(IW,FMT='(I4, I4, 1X, F3.0)') IX, IY, SPIN(IX,IY,K)
-          ENDDO
-          ! 改行
-          WRITE(IW,*)
-        ENDDO
-        CLOSE(IW)
-
-        OPEN(IW,FILE="en.dat",STATUS="OLD",POSITION="APPEND")
-        WRITE(IW,*) TAU, K,  EN/(N**2)
-        CLOSE(IW)
       ENDIF
       END
