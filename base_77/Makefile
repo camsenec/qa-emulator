@@ -5,16 +5,16 @@ FFLAGS =
 
 .SUFFIXES: .f .o
 
-.f.o:
-	$(FC) $(FFLAGS) -c $<
-
 OBJS = qa.o
 
-main:
+main: PIMC $(OBJS)
 	./PIMC
 
-pimc: $(OBJS)
+PIMC: $(OBJS)
 	$(FC) $(OBJS) -o PIMC
+
+qa.o: qa.f
+	$(FC) $(FFLAGS) -c $<
 
 clean:
 	rm -rf $(OBJS) PIMC *.mod
