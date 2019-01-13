@@ -1,3 +1,6 @@
 *.dat
 a.out
-
+PIMC
+pimc
+*.o
+*.mod

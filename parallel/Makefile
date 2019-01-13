@@ -1,7 +1,7 @@
 .PHONY: clean
 
-FC = gfortran
-FFLAGS =
+FC = mpif90
+FFLAGS = -fopenmp
 
 .SUFFIXES: .f90 .o
 
@@ -11,6 +11,9 @@ FFLAGS =
 OBJS = constants.o \
        calc_energ.o \
        qa.o
+
+main: pimc
+	mpirun -np 4 ./pimc
 
 pimc: $(OBJS)
 	$(FC) $(OBJS) -o pimc
