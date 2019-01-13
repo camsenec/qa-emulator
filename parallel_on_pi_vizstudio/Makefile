@@ -21,6 +21,4 @@ pimc:$(OBJS)
 	$(FC) $(OBJS) -o pimc $(FFLAGS)
 
 clean:
-	rm -rf $(OBJS) pimc *.mod
-
-
+	rm -rf $(OBJS) pimc *.mod *QA*

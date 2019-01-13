@@ -318,7 +318,7 @@ program qa
         deallocate(j_couple)
         deallocate(spin_old, spin_new)
         close(IN)
-        close(IN2)
+      !  close(IN2)
         stop
 
       end if
@@ -340,7 +340,7 @@ program qa
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   close(IN)
-  close(IN2)
+  !close(IN2)
 
 contains
 
