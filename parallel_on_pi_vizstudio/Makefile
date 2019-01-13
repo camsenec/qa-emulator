@@ -1,22 +1,26 @@
-.PHONY: clean
+.PHONY:clean
 
-FC = mpif90
-FFLAGS = -fopenmp
+FC = ifort
+FFLAGS = -lmpi
+INCLUDE = -I/opt/sgi/mpt/mpt-2.14/include/
 
-.SUFFIXES: .f90 .o
+.SUFFIXES:.f90 .o
 
 .f90.o:
-	$(FC) $(FFLAGS) -c $<
+	$(FC) -c $< $(FFLAGS)
 
 OBJS = constants.o \
        calc_energ.o \
        qa.o
 
-main: pimc
-	mpirun -np 4 -quiet ./pimc
+main:pimc
+	mpirun -np 12 dplace -s1 ./pimc
 
-pimc: $(OBJS)
-	$(FC) $(OBJS) -o pimc
+pimc:$(OBJS)
+	qsub js_qa.sh
+	$(FC) $(OBJS) -o pimc $(FFLAGS)
 
 clean:
 	rm -rf $(OBJS) pimc *.mod
+
+
