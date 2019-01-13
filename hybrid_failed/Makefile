@@ -1,7 +1,7 @@
 .PHONY: clean
 
-FC = gfortran
-FFLAGS =
+FC = mpif90
+FFLAGS = -fopenmp
 
 .SUFFIXES: .f90 .o
 
@@ -13,10 +13,10 @@ OBJS = constants.o \
        qa.o
 
 main: pimc
-	time ./pimc
+	MPI_NUM_THREADS=4 mpirun -np 4 -quiet ./pimc
 
 pimc: $(OBJS)
-	$(FC) $(OBJS) -o pimc
+	$(FC) $(OBJS) -o pimc $(FFLAGS)
 
 clean:
 	rm -rf $(OBJS) pimc *.mod

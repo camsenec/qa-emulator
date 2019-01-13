@@ -5,6 +5,7 @@
 !-------------------------------------------------------------------
 
 program qa
+  !$use omp_lib
   use constants_m
   use calc_energ_m
   implicit none
@@ -219,6 +220,8 @@ program qa
 
     ! mc on each slice
     do k = 1, m_sub
+!$omp parallel private(y)
+!$omp do
       do x = 1, n
         do y = 1, n
           ! select reversed site
@@ -263,6 +266,8 @@ program qa
 
         end do
       end do
+!$omp end do
+!$omp end parallel
     end do
 
     call mpi_barrier(MPI_COMM_WORLD, ierror)

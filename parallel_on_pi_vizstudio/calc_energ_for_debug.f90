@@ -10,7 +10,7 @@ contains
     integer(SI), dimension(n,n,m_sub+1) :: spin
     integer(SI) :: ix, iy, jx, jy
     integer(SI), intent(in) :: n
-    integer(SI), intent(in) :: k, m_sub
+    integer(DI), intent(in) :: k, m_sub
     real(DR) :: energ_sa
 
     energ_sa = 0.0d0
@@ -37,7 +37,7 @@ contains
     integer(SI), dimension(n,n,m_sub+1), intent(in) :: spin
     integer(SI), intent(in) :: n
     integer(SI) :: ix, iy, jx, jy
-    integer(SI), intent(in) :: m, m_sub
+    integer(DI), intent(in) :: m, m_sub
     integer(DI) :: k
     real(DR) :: energ_qa
 
@@ -70,6 +70,14 @@ contains
       end do
     end do
 
+    !do iy = 1, n
+      !do ix = 1, n
+        !energ_1(m_sub) = energ_1(m_sub) - spin(ix,iy,m_sub) * spin(ix ,iy, 1)
+      !end do
+    !end do
+    !  print *, "energ_1", sum(energ_0) / size(energ_0)
+    !  print *, "energ_2", j_tilda * sum(energ_1)
+
     energ_qa = sum(energ_0) / m + j_tilda * sum(energ_1)
   end function energ_qa
 
@@ -80,7 +88,7 @@ contains
     integer(SI), dimension(n,n,m_sub+1), intent(in) :: spin
     integer(SI) :: x, y
     integer(SI), intent(in) :: site_x, site_y, n
-    integer(SI), intent(in) :: m, m_sub, k
+    integer(DI), intent(in) :: m, m_sub, k
     real(DR) :: delta_energ_0, delta_energ_1
     real(DR) :: delta_qa
 
@@ -97,6 +105,10 @@ contains
       end do
     end do
 
+    !if(k == m_sub) then
+      !delta_energ_1 = delta_energ_1 - spin(site_x, site_y, m) * &
+      !spin(site_x, site_y, 1)
+    !end
     delta_energ_1 = delta_energ_1 - spin(site_x, site_y, k) * &
     spin(site_x, site_y, k + 1)
 

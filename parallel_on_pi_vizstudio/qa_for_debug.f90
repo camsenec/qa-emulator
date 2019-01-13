@@ -24,17 +24,15 @@ program qa
   ! spin_old(i,:,:): i番目のトロッタースライスの遷移前の状態
   ! spin_new(i,:,:): i番目のトロッタースライスの遷移後の状態
   integer(SI), allocatable, dimension(:,:,:) :: spin_old, spin_new
-  ! spin_old_send(:,:): 送信するデータ. 1番目のトロッタースライス
-  ! spin_old_recv(:,:): 受信するデータ. msub+1番目のスライスに格納する
+  ! spin_old_send(:,:): 送信する1番目のトロッタースライス
+  ! spin_old_recv(:,:): 受信するmsub+1番目のトロッタースライス
   integer(SI), allocatable, dimension(:) :: spin_old_send, spin_old_recv
   ! energ_old(i,:) : i番目のスライスの遷移前のエネルギー
   ! energ_new(i,:) : i番目のスライスの遷移後のエネルギー
-  real(DR), dimension(10000) :: energ
+  real(DR), dimension(100) :: energ
   ! energ_old_qa : 遷移前の合計エネルギー, energ_new_qa : 遷移後の合計エネルギ-
   ! energ_delta : 遷移前から遷移後のエネルギー差
   real(DR) :: energ_old_qa, energ_new_qa, energ_delta, energ_old_qa_part
-  ! energ_send, energ_recv :　終了判定に用いる
-  real(DR) :: energ_send, energ_recv
   ! j_couple : カップリング
   real(DR), dimension(:,:,:,:), allocatable :: j_couple
   ! p: 反転させる確率, p_base : p>p_baseであるときに反転させる
@@ -52,7 +50,7 @@ program qa
   ! beta : 逆温度
   real(DR) :: beta
   ! m : トロッター数, k : 各スライス
-  integer(SI) :: m, m_sub, k
+  integer(DI) :: m, m_sub, k
   ! mt : m/beta
   real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
@@ -62,7 +60,7 @@ program qa
   integer(SI) :: myrank, nprocs, ierror
   integer(SI) :: status(MPI_STATUS_SIZE)
   integer(SI) :: lower, upper
-  integer(SI) :: local_count, global_count
+  integer(SI) :: vec_type
   !t0 : 並列リージョン突入時間, t1 : 並列リージョン離脱時間
   real(DR) :: t0, t1
 
@@ -81,7 +79,7 @@ program qa
   !-------- initialize for io-------
   ! open file
   open(IN, file = "SG.dat", status = 'old')
-  !open(IN2, file = 'Spin_SA.dat', status = 'old')
+  open(IN2, file = 'Spin_SA.dat', status = 'old')
 
   !--------read parameter(rf. roman martonak et al.)------
   if (myrank == 0) then
@@ -122,8 +120,6 @@ program qa
   else
     gamma_init = 2.5
   end if
-
-  gamma_init = 3
 
   ! set gamma and qa_step
   gamma = gamma_init
@@ -182,6 +178,12 @@ program qa
   ! initialize spin of all slice
   call init_sg(spin_old, m_sub+1, n)
 
+  !do x = 1,n
+  !  do y = 1,n
+    !  print *, spin_old(x,y,1)
+  !  end do
+  !end do
+
   !======== Preannealing with SA ========
   ! do
   !   read(IN2,*,end=100) x, y, k, tmp
@@ -217,6 +219,12 @@ program qa
     energ_old_qa = energ_qa(j_couple, spin_old, j_tilda, m_sub, m, n)
     !print *, energ_old_qa_part
 
+    call mpi_barrier(MPI_COMM_WORLD, ierror)
+
+    !call mpi_allreduce(energ_old_qa_part, energ_old_qa, 1, MPI_REAL8, MPI_SUM, &
+      !MPI_COMM_WORLD, ierror)
+    !psprint *, energ_old_qa
+
     ! mc on each slice
     do k = 1, m_sub
       do x = 1, n
@@ -231,6 +239,7 @@ program qa
           ! calculate energ_new
           energ_delta = delta_qa(j_couple, spin_new, j_tilda, site_x, site_y, k, m_sub, m, n)
           energ_new_qa = energ_old_qa + energ_delta
+          !print *,  tau, energ_old_qa , energ_new_qa
 
           ! calculate p
           if (energ_delta <= 0) then
@@ -247,17 +256,45 @@ program qa
             energ_old_qa = energ_new_qa
           end if
 
-          if (k ==  1) then
+          call mpi_barrier(MPI_COMM_WORLD, ierror)
 
+          if (k ==  1) then
             !copy slice(k = 1) to spin_old_send
             call spin_copy_to1D(spin_old, spin_old_send, m_sub, n)
 
-            call mpi_sendrecv(spin_old_send, n*n, MPI_INTEGER, lower, 100,  &
-                              spin_old_recv ,n*n, MPI_INTEGER, upper, 100, &
-                              MPI_COMM_WORLD, status, ierror)
+          !  do i = 1,5
+          !    print *, "send copy", "rank : ", myrank, i, "番目 :", spin_old(i,2,1)
+          !  end do
 
-            !copy spin_old_recv to slice(k = m_sub - 1)
+          !  do i = 21,25
+          !    print *, " send copyed ", "rank : ", myrank , i-n, "番目 : ", spin_old_send(i)
+          !  end do
+
+            call mpi_sendrecv(spin_old_send, n*n, MPI_INTEGER, lower, 100,  &
+                            spin_old_recv ,n*n, MPI_INTEGER, upper, 100, &
+                            MPI_COMM_WORLD, status, ierror)
+
+            !do i = 5,10
+            !  print *, " send ", "rank : ", myrank , i, "番目 : ", spin_old_send(i)
+            !end do
+
+            !do i = 5,10
+            !  print *, "recv", "rank : ", myrank, i, "番目 :", spin_old_recv(i)
+            !end do
+
+            !print *, "sendrecv_end"
+            !received slice(k = 1) data to spin_old
             call spin_copy_to3D(spin_old_recv, spin_old, m_sub ,n)
+
+            !do i = 21,25
+            !  print *, " recv copy ", "rank : ", myrank , i-n, "番目 : ", spin_old_recv(i)
+            !end do
+
+            !do i = 1,5
+            !  print *, "recv copyed", "rank : ", myrank, i, "番目 :", spin_old(i,2,m_sub+1)
+            !end do
+
+            !call sleep(10)
 
           end if
 
@@ -266,65 +303,34 @@ program qa
     end do
 
     call mpi_barrier(MPI_COMM_WORLD, ierror)
-
     !output energy of each slic
     do k =  1, m_sub
       energ(k) = energ_sa(j_couple, spin_old, k, m_sub, n)
     end do
 
-    !end judge and check state of each slice
-    !if energy between adjacent slice is the same , increment local_count
-    local_count = 0
     do k = 1, m_sub
-      if (k < m_sub .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
-        local_count = local_count + 1
-      end if
       print *, gamma , energ(k)
     end do
 
-    call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
-      MPI_COMM_WORLD, ierror)
+    !call mpi_barrier(MPI_COMM_WORLD, ierror)
+    !if(myrank == 1) then
+    !  print *,  'myrank = 1'
+    !  do x = 1,n
+    !    do y = 1,n
+    !      print *, spin_old(x,y,1)
+    !    end do
+    !  end do
+  !  end if
 
-    print *, "global_count", global_count
-
-    !if energ is the same in each slice, make sure energy between the processes is the same
-    if(global_count .ge. (m_sub - 1) * nprocs) then
-      local_count = 0
-      energ_send = energ(1)
-
-      call mpi_sendrecv(energ_send, 1, MPI_REAL8, lower, 100,  &
-                        energ_recv ,1, MPI_REAL8, upper, 100, &
-                        MPI_COMM_WORLD, status, ierror)
-
-      !if energy between the processes is the same , increment local_count
-      if(abs(energ_send - energ_recv) .le. EPS*1e-4) then
-        local_count = local_count + 1
-      end if
-
-      call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
-        MPI_COMM_WORLD, ierror)
-
-      print *, "global_count2", global_count
-
-      !end program
-      if (global_count .ge. nprocs / 2) then
-        call mpi_barrier(MPI_COMM_WORLD, ierror)
-        t1 = mpi_wtime()
-
-        print *, "time : ", t1 - t0
-
-        !call mpi_type_free(vec_type, ierror)
-
-        deallocate(j_couple)
-        deallocate(spin_old, spin_new)
-        close(IN)
-        close(IN2)
-        stop
-
-      end if
-
-    end if
-
+    !call mpi_barrier(MPI_COMM_WORLD, ierror)
+    !if(myrank == 0) then
+    !  print *, 'myrank = 0'
+    !  do x = 1,n
+    !    do y = 1,n
+    !      print *, spin_old(x,y,m_sub+1)
+    !    end do
+    !  end do
+    !end if
     ! update gamma
     gamma = 0.99*gamma
 
@@ -335,7 +341,7 @@ program qa
 
   print *, "time : ", t1 - t0
 
-  !call mpi_type_free(vec_type, ierror)
+  call mpi_type_free(vec_type, ierror)
 
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
@@ -368,7 +374,7 @@ contains
     integer(SI) :: x, y
     integer(SI), intent(in) :: n
     integer(DI) :: k
-    integer(SI), intent(in) :: m
+    integer(DI), intent(in) :: m
     integer(SI),dimension(n,n,m), intent(inout) :: spin
     real(SR) tmp
 
@@ -432,7 +438,7 @@ contains
   subroutine reverse_spin(site_x, site_y, spin_old, spin_new, k, m_sub, n)
     implicit none
     integer(SI), intent(in) :: n, site_x, site_y
-    integer(SI), intent(in) :: k, m_sub
+    integer(DI), intent(in) :: k, m_sub
     integer(SI), dimension(n,n,m_sub+1), intent(inout) :: spin_old, spin_new
 
     spin_new = spin_old
@@ -448,7 +454,7 @@ contains
     integer(SI), dimension(n,n,m_sub+1), intent(in) :: spin_old
     integer(SI), dimension(n*n), intent(inout) :: spin_old_send
     integer(SI), intent(in) :: n
-    integer(SI), intent(in) :: m_sub
+    integer(DI), intent(in) :: m_sub
     integer(SI) :: x, y
 
     do y = 1,n
@@ -464,7 +470,7 @@ contains
     integer(SI), dimension(n*n), intent(in) :: spin_old_recv
     integer(SI), dimension(n,n,m_sub+1), intent(inout) :: spin_old
     integer(SI), intent(in) :: n
-    integer(SI), intent(in) :: m_sub
+    integer(DI), intent(in) :: m_sub
     integer(SI) :: x, y
 
     do y = 1,n
