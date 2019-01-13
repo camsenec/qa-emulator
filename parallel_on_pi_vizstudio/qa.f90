@@ -285,7 +285,7 @@ program qa
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
 
-    print *, "global_count", global_count
+    !print *, "global_count", global_count
 
     !if energ is the same in each slice, make sure energy between the processes is the same
     if(global_count .ge. (m_sub - 1) * nprocs) then
@@ -304,14 +304,16 @@ program qa
       call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
         MPI_COMM_WORLD, ierror)
 
-      print *, "global_count2", global_count
+      !print *, "global_count2", global_count
 
       !end program
       if (global_count .ge. nprocs / 2) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
-
-        print *, "time : ", t1 - t0
+        
+        if(myrank == 0) then
+          print *, "time : ", t1 - t0
+        end if
 
         !call mpi_type_free(vec_type, ierror)
 
