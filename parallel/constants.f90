@@ -12,9 +12,13 @@ module constants_m
 
   ! <<IO constants >
   ! in : 読み込みファイルのための装置番号
-  integer(SI),parameter :: in = 17
+  integer(SI),parameter :: IN = 17
   ! in2 : 読み込みファイルのための装置番号
-  integer(SI),parameter :: in2 = 18
+  integer(SI),parameter :: IN2 = 18
+
+  ! <<MPI constants >
+  integer(SI),parameter :: ROOT = 0
+
 
 
 end module constants_m

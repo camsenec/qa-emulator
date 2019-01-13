@@ -27,7 +27,7 @@ program qa
   real(DR), allocatable :: energ_old(:), energ_new(:)
   ! energ_old_qa : 遷移前の合計エネルギー, energ_new_qa : 遷移後の合計エネルギ-
   ! energ_delta : 遷移前から遷移後のエネルギー差
-  real(DR), allocatable :: energ_old_qa, energ_new_qa, energ_delta
+  real(DR) :: energ_old_qa, energ_new_qa, energ_delta
   ! j_couple : カップリング
   real(DR), dimension(:,:,:,:), allocatable :: j_couple
   ! p: 反転させる確率, p_base : p>p_baseであるときに反転させる
