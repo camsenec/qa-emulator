@@ -87,8 +87,8 @@ program qa
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
   !  beta = 10
-  ! reset initial gamma
-  !  gamma_init = 1
+  !reset initial gamma
+  gamma_init = 3
   ! set gamma and qa_step
 
   gamma = gamma_init
@@ -178,10 +178,22 @@ program qa
       energ_old(k) = energ_sa(j_couple, spin_old, k, m, n)
     end do
 
+    count = 0
     do k = 1, m
+      if (k < m .and. abs(energ_old(k) - energ_old(k + 1)) .le. EPS*1e-4) then
+        count = count + 1
+      end if
       print *, gamma , energ_old(k)
     end do
-    write(*,*)
+
+    if(count == m - 1) then
+      deallocate(j_couple)
+      deallocate(spin_old, spin_new)
+      deallocate(energ_old, energ_new)
+      close(in)
+      close(in2)
+      stop
+    end if
 
     ! update gamma
     gamma = 0.99*gamma
