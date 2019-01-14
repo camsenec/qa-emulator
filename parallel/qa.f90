@@ -307,7 +307,7 @@ program qa
       print *, "global_count2", global_count
 
       !end program
-      if (global_count .ge. nprocs / 2) then
+      if (global_count .ge. nprocs - 2) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
 

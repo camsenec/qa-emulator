@@ -115,6 +115,12 @@ program qa
   ! initialize coupling
   call init_coupling(j_couple, n, in)
 
+  !initialize output file for animation
+  do k = 1,m
+    CALL spndat(-1,spin_old,n,k)
+  end do
+
+
   !======== Preannealing with SA ========
   ! do
   !   read(in2,*,end=100) x, y, k, tmp
@@ -179,14 +185,16 @@ program qa
     end do
 
     count = 0
+    print *, "qa_step : ", i
     do k = 1, m
       if (k < m .and. abs(energ_old(k) - energ_old(k + 1)) .le. EPS*1e-4) then
         count = count + 1
       end if
       print *, gamma , energ_old(k)
+      call spndat(i, spin_old, k, m, n)
     end do
 
-    if(count == m - 1) then
+    if(count .ge. m - 2) then
       deallocate(j_couple)
       deallocate(spin_old, spin_new)
       deallocate(energ_old, energ_new)
@@ -304,5 +312,35 @@ contains
       spin_new(site_x, site_y, k) = -1
     end if
   end subroutine reverse_spin
+
+  subroutine spndat(t,spin, k, m, n)
+    implicit none
+    integer(SI), intent(in) :: t, k, m, n
+    integer(SI), dimension(n,n,m), intent(in) :: spin
+    integer(SI) :: ix,iy
+    integer(SI), parameter :: iw = 5000
+    character(len=48) :: file_name
+    character(len=8) :: file_num
+
+    write(file_num,*) k
+    file_name = "./data/spin" // trim(file_num) // ".dat"
+
+    if(t.eq.-1) then
+      open(iw,file=file_name,status="replace")
+      close(iw)
+    else
+      open(iw,file=file_name,status="old",position="append")
+      do iy = 1, n
+        do ix = 1, n
+          write(iw,fmt='(i4, i4, 1x, i4)') ix, iy, spin(ix,iy,k)
+        enddo
+        ! 改行
+        write(iw,*)
+      enddo
+      close(iw)
+
+    endif
+  end subroutine spndat
+
 
 end program qa
