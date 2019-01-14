@@ -3,3 +3,4 @@ PIMC
 pimc
 *.o
 *.mod
+./grapher/*.dat

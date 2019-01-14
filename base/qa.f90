@@ -92,7 +92,7 @@ program qa
   ! set gamma and qa_step
 
   gamma = gamma_init
-  qa_step = 500000 / n*n
+  qa_step = 400000 / n*n
 
   print *, 'beta:', beta
   print *, 'initial_gamma:', gamma_init
