@@ -123,8 +123,6 @@ program qa
     gamma_init = 2.5
   end if
 
-  gamma_init = 3
-
   ! set gamma and qa_step
   gamma = gamma_init
   qa_step = 500000 / n*n
@@ -133,7 +131,7 @@ program qa
   ! reset beta(kt = 0.1)
   !  beta = 10
   ! reset initial gamma
-  !  gamma_init = 1
+   gamma_init = 3
 
 
   !-------- parameter for parallel processing------

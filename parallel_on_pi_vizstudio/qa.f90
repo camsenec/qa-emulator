@@ -132,7 +132,7 @@ program qa
   ! reset beta(kt = 0.1)
    !beta = 10
  ! reset initial gamma
-   gamma_init = 10
+   gamma_init = 3
 
 
   !-------- parameter for parallel processing------
@@ -309,7 +309,7 @@ program qa
       if (global_count .ge. nprocs - 2) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
-        
+
         if(myrank == 0) then
           print *, "time : ", t1 - t0
         end if
