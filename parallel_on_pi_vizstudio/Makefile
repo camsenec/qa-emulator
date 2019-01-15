@@ -14,13 +14,20 @@ OBJS = constants.o \
        qa.o
 
 main:pimc
-	mpirun -np 15 dplace -s1 ./pimc
-
-pimc:$(OBJS)
-	$(FC) $(OBJS) -o pimc $(FFLAGS)
+	mpirun -np 4 dplace -s1 ./pimc
 
 job:
 	qsub js_qa.sh
+
+task:result
+	chmod 755 task.sh
+	./task.sh params.dat
+  
+pimc:$(OBJS)
+	$(FC) $(OBJS) -o pimc $(FFLAGS)
+
+result:result.f90
+	$(FC) result.f90 -o result
 
 clean:
 	rm -rf $(OBJS) pimc *.mod *QA*

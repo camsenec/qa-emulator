@@ -17,7 +17,7 @@ program qa
   integer(SI) :: tmp
   ! tau : モンテカルロステップ数
   integer(DI) :: tau
-    ! n : 1スライスにおけるサイト数
+  ! n : 1スライスにおけるサイト数
   integer(SI) :: n
   !x:サイトのx座標, y:サイトのy座標
   integer(SI) :: x, y
@@ -57,6 +57,7 @@ program qa
   real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
+  real(DR) :: alpha
 
   !--------parameter for parallel processing--------
   integer(SI) :: myrank, nprocs, ierror
@@ -82,33 +83,37 @@ program qa
   ! open file
   open(IN, file = "SG.dat", status = 'old')
   !open(IN2, file = 'Spin_SA.dat', status = 'old')
+  open(PARAM, file = "paramIn.dat", status = 'old')
+  open(OUT,file = 'data.dat', status = 'old', position = 'append')
 
   !--------read parameter(rf. roman martonak et al.)------
-  if (myrank == 0) then
+  !if (myrank == 0) then
     ! set mt(m/beta)
-    do
-      print * , 'm/beta(1 or 1.5 or 2)'
-      read(*,*) mt
-      if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
-        exit
-      end if
-    end do
+  !  do
+  !    print * , 'm/beta(1 or 1.5 or 2)'
+  !    read(*,*) mt
+  !    if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
+  !      exit
+  !    end if
+  !  end do
 
     ! set m
-    do
-      print * , 'm (must : m mod nprocs = 0)'
-      read(*,*) m
-      if (mod(m,nprocs) == 0) then
-        exit
-      end if
-    end do
+  !  do
+  !    print * , 'm (must : m mod nprocs = 0)'
+  !    read(*,*) m
+  !    if (mod(m,nprocs) == 0) then
+  !      exit
+  !    end if
+  !  end do
 
-    print *, 'initial gamma'
-    read(*,*) gamma_init
-    ! set n
-    read(IN,*) n
+  !  print *, 'initial gamma'
+  !  read(*,*) gamma_init
+  !  set n
+     read(IN,*) n
 
-  end if
+  !end if
+
+  read(PARAM,*) mt, m, gamma_init
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   call mpi_bcast(mt, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
@@ -130,7 +135,8 @@ program qa
   ! set gamma and qa_step
   gamma = gamma_init
   qa_step = 500000 / n*n
-
+  alpha = (1e-8/dble(gamma_init))**(1/dble(qa_step))
+  print *, 'alpha', alpha
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
   !  beta = 10
@@ -324,9 +330,13 @@ program qa
       end if
 
       !end program
-      if (global_count .ge. nprocs - 2) then
+      if (global_count .ge. nprocs) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
+       
+        if(myrank == 0) then 
+          write(OUT,*) minval(energ)
+        end if
 
         print *, "time : ", t1 - t0
 
@@ -336,6 +346,8 @@ program qa
         deallocate(spin_old, spin_new)
         close(IN)
       !  close(IN2)
+        close(PARAM)
+        close(OUT)
         stop
 
       end if
@@ -343,7 +355,8 @@ program qa
     end if
 
     ! update gamma
-    gamma = 0.99*gamma
+    gamma = 0.999*gamma
+    !gamma = alpha**tau * gamma_init
 
   end do
 
@@ -358,6 +371,8 @@ program qa
   deallocate(spin_old, spin_new)
   close(IN)
   !close(IN2)
+  close(PARAM)
+  close(OUT)
 
 contains
 
@@ -502,7 +517,7 @@ contains
     integer(SI), parameter :: iw = 5000
     character(len=128) :: file_name
 
-    file_name = trim('./data/en.dat')
+    file_name = trim('data/en.dat')
 
     if(tau.eq.-1) then
       open(iw,file=file_name,STATUS="replace")
