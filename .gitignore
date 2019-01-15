@@ -6,3 +6,5 @@ pimc
 grapher/*.dat
 base/data/*
 base/result/*
+parallel/data/**
+parallel_on_pi_vizstudio/data/*

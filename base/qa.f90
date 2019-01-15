@@ -72,14 +72,18 @@ program qa
   print *, 'm(dont set square number for plot)[default :10]'
   read(*,*) m
 
+  print *, 'initial gamma'
+  read(*,*) gamma_init
+
+
   ! set beta(becaues mt = m  / beta))
   beta = m / mt
 
   ! set initial gamma
   if (abs(mt-1) < EPS) then
-    gamma_init = 3
+    !gamma_init = 3
   else
-    gamma_init = 2.5
+    !gamma_init = 2.5
   end if
 
   ! set n
@@ -89,7 +93,7 @@ program qa
   ! reset beta(kt = 0.1)
   !  beta = 10
   !reset initial gamma
-  gamma_init = 5
+  !gamma_init = 5
   ! set gamma and qa_step
 
   gamma = gamma_init

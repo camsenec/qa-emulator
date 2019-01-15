@@ -16,8 +16,11 @@ module constants_m
   ! in2 : 読み込みファイルのための装置番号
   integer(SI),parameter :: IN2 = 18
 
+  integer(SI),parameter :: DEV = 5
+
   ! <<MPI constants >
   integer(SI),parameter :: ROOT = 0
+
 
 
 
