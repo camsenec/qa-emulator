@@ -144,7 +144,6 @@ program qa
   !  beta = 10
   ! reset initial gamma
   !gamma_init = 3
-  beta = 0.2
 
 
   !-------- parameter for parallel processing------
@@ -336,8 +335,8 @@ program qa
       if (global_count .ge. nprocs) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
-       
-        if(myrank == 0) then 
+
+        if(myrank == 0) then
           write(OUT,*) minval(energ)
           write(OUT2, '(F10.3)') t1 - t0
         end if
@@ -359,8 +358,6 @@ program qa
 
     ! update gamma
     gamma = 0.999*gamma
-    !beta = 1.01*beta
-    !gamma = alpha**tau * gamma_init
 
   end do
 

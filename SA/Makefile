@@ -1,9 +1,23 @@
 .PHONY: main view clean
 
-FC = ifort
+FC = gfortran
+#FC = ifort
+#dplace ./spinglass
 
-main:spinglass
-	dplace ./spinglass
+.SUFFIXES: .f90 .o
+
+.f90.o:
+	$(FC) $(FFLAGS) -c $<
+
+OBJS = constants.o \
+			 calc_energ.o \
+			 sa.o
+
+main:sa
+	./sa
+
+sa: $(OBJS)
+	$(FC) $(OBJS) -o sa
 
 view:SpinGlass.gp
 	gnuplot SpinGlass.gp
@@ -15,11 +29,8 @@ task:result spinglass
 	./task.sh
 	./result
 
-spinglass:SpinGlass_SA.f
-	$(FC) SpinGlass_SA.f -o spinglass
-
 result:result.f90
 	$(FC) result.f90 -o result
 
 clean:
-	rm -rf spinglass result SpinGlass.gif
+	rm -rf sa result SpinGlass.gif *.o *.mod

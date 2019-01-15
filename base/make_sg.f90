@@ -23,7 +23,7 @@ program make_sg
 
   count = 0
 
-  do while(count .lt. 80000)
+  do while(count .lt. n**4 / 4)
 
     call random_number(tmp)
     ix = ceiling(tmp * n)
@@ -37,16 +37,18 @@ program make_sg
     call random_number(tmp)
     jy = ceiling(tmp * n)
 
-    if((abs(j_couple(ix,iy,jx,jy) - (-10.0)) < EPS) .and. (abs(j_couple(jx,jy,ix,iy) - (-10.0)) < EPS)) then
-      call random_number(tmp)
-      call random_number(tmp2)
+    if(.not.(ix == jx .and. iy == jy)) then
+      if((abs(j_couple(ix,iy,jx,jy) - (-10.0)) < EPS) .and. (abs(j_couple(jx,jy,ix,iy) - (-10.0)) < EPS)) then
+        call random_number(tmp)
+        call random_number(tmp2)
 
-      if(tmp2 >= 0.5) then
-        j_couple(ix,iy,jx,jy) = tmp
-      else
-        j_couple(ix,iy,jx,jy) = -tmp
+        if(tmp2 >= 0.5) then
+          j_couple(ix,iy,jx,jy) = tmp
+        else
+          j_couple(ix,iy,jx,jy) = -tmp
+        end if
+        count = count + 1
       end if
-      count = count + 1
     end if
   end do
 

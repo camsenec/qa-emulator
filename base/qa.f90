@@ -212,9 +212,8 @@ program qa
       close(out)
       stop
     end if
-
     ! update gamma
-    gamma = 0.99*gamma
+    gamma = gamma * 0.99
 
   end do
 
