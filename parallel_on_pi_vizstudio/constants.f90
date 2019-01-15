@@ -17,6 +17,7 @@ module constants_m
   integer(SI),parameter :: IN2 = 18
   integer(SI),parameter :: PARAM = 19
   integer(SI),parameter :: OUT = 20
+  integer(SI),parameter :: OUT2 = 21
 
   ! <<MPI constants >
   integer(SI),parameter :: ROOT = 0

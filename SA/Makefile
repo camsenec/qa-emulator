@@ -8,8 +8,9 @@ main:spinglass
 view:SpinGlass.gp
 	gnuplot SpinGlass.gp
 
-task: result
+task:result spinglass
 	cat /dev/null > data.dat
+	cat /dev/null > time.dat
 	chmod 755 task.sh
 	./task.sh
 	./result
@@ -17,8 +18,8 @@ task: result
 spinglass:SpinGlass_SA.f
 	$(FC) SpinGlass_SA.f -o spinglass
 
-result:result.f
-	$(FC) result.f -o result
+result:result.f90
+	$(FC) result.f90 -o result
 
 clean:
 	rm -rf spinglass result SpinGlass.gif

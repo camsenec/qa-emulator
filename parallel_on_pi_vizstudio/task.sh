@@ -4,6 +4,7 @@ while read line
 do
   echo $line > paramIn.dat
   : > data.dat
+  : > time.dat
   i=0
   while [ $i -lt 45 ]
   do

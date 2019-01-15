@@ -35,6 +35,7 @@ C     IN : 読み込みファイルのための装置番号
       INTEGER,PARAMETER::IN = 18
 C     ARGS : 引数読み込みファイルのための装置番号
       INTEGER,PARAMETER::ARGS = 19
+      INTEGER,PARAMETER::OUT2 = 20
 
 C     --------Parameter for SA(Simulated Annealing)--------
 C     SA_STEP : SAのステップ数
@@ -48,23 +49,30 @@ C     KT_FIN : 最終温度
 C     ALPHA : 冷却率
       REAL*8 ALPHA
 
+      INTEGER T1, T2, T_RATE, T_MAX, DIFF
+
 C     ======== INITIALIZE ========
 C     OPEN FILE
       OPEN(OUT,FILE = 'data.dat',STATUS = 'OLD',
      &POSITION = 'APPEND')
-      OPEN(IN, FILE = "SG.dat", STATUS = 'UNKNOWN')
+      OPEN(IN, FILE = "SG_complex.dat", STATUS = 'UNKNOWN')
 C      OPEN(ARGS,FILE = "ARGS.DAT", STATUS = 'UNKNOWN')
+      OPEN(OUT2, FILE = 'time.dat', STATUS = 'OLD',
+     &POSITION = 'APPEND')
+    
 
 C     SET RANDOM SEED
       CALL RND_SEED
 
 C     READ N, KT, KT_FIN FROM COMMANDLINE
 
-      PRINT * , 'SA_STEP(DEFAULT : 600000)'
-      READ(*, *) SA_STEP
-      PRINT * , 'KT_INIT(DEFAULT : 5)'
-      READ(*, *) KT_INIT
+C      PRINT * , 'SA_STEP(DEFAULT : 600000)'
+C      READ(*, *) SA_STEP
+C      PRINT * , 'KT_INIT(DEFAULT : 5)'
+C      READ(*, *) KT_INIT
 
+      SA_STEP = 5000000
+      KT_INIT = 5
       READ(IN,*) N
       ALLOCATE(J(N,N,N,N))
       ALLOCATE(SPIN_A(N,N))
@@ -90,6 +98,7 @@ C     SET KT, KT_FIN , ALPHA
       ALPHA = (KT_FIN/DBLE(KT_INIT))**(1/DBLE(SA_STEP))
       PRINT * , "ALPHA", ALPHA
 
+      CALL SYSTEM_CLOCK(T1)   ! 開始時を記録
 C     ======== MONTE-CARLO SIMULATION ========
       DO T = 1, SA_STEP
         IF(KT == 0) THEN
@@ -150,7 +159,16 @@ C       UPDATE TEMPARATURE
 
       ENDDO
 
-      WRITE(OUT,FMT = '(F0.9, F13.9)') EXPECTED_E, EXPECTED_M
+      CALL SYSTEM_CLOCK(T2, T_RATE, T_MAX)   ! 終了時を記録
+      IF ( T2 < T1 ) THEN
+      DIFF = (T_MAX - T1) + T2 + 1
+      ELSE
+      DIFF = T2 - T1
+      ENDIF
+      PRINT "(A, F10.3)", "time it took was:", DIFF/DBLE(T_RATE)
+      WRITE (OUT2, FMT='(F10.3)'), DIFF/DBLE(T_RATE)  
+
+      WRITE(OUT,FMT = '(F0.9)') EXPECTED_E/N*N
 
 
       DEALLOCATE(J)

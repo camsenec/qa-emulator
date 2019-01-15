@@ -14,7 +14,7 @@ OBJS = constants.o \
        qa.o
 
 main:pimc
-	mpirun -np 4 dplace -s1 ./pimc
+	mpirun -np 12 dplace -s1 ./pimc
 
 job:
 	qsub js_qa.sh

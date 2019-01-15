@@ -81,10 +81,12 @@ program qa
   !======== initialize parameter ========
   !-------- initialize for io-------
   ! open file
-  open(IN, file = "SG.dat", status = 'old')
+  open(IN, file = "SG_complex.dat", status = 'old')
   !open(IN2, file = 'Spin_SA.dat', status = 'old')
   open(PARAM, file = "paramIn.dat", status = 'old')
   open(OUT,file = 'data.dat', status = 'old', position = 'append')
+
+  open(OUT2,file = 'time.dat', status = 'old', position = 'append')
 
   !--------read parameter(rf. roman martonak et al.)------
   !if (myrank == 0) then
@@ -142,6 +144,7 @@ program qa
   !  beta = 10
   ! reset initial gamma
   !gamma_init = 3
+  beta = 0.2
 
 
   !-------- parameter for parallel processing------
@@ -291,7 +294,7 @@ program qa
 
     local_count = 0
     do k = 1, m_sub
-      if (k < m_sub .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
+      if (k < m_sub - 1 .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
       !for data analysis
@@ -309,7 +312,7 @@ program qa
     end if
 
     !if energ is the same in each slice, make sure energy between the processes is the same
-    if(global_count .ge. (m_sub - 1) * nprocs) then
+     !if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
 
@@ -336,6 +339,7 @@ program qa
        
         if(myrank == 0) then 
           write(OUT,*) minval(energ)
+          write(OUT2, '(F10.3)') t1 - t0
         end if
 
         print *, "time : ", t1 - t0
@@ -352,10 +356,10 @@ program qa
 
       end if
 
-    end if
 
     ! update gamma
     gamma = 0.999*gamma
+    !beta = 1.01*beta
     !gamma = alpha**tau * gamma_init
 
   end do
@@ -364,6 +368,7 @@ program qa
   t1 = mpi_wtime()
 
   print *, "time : ", t1 - t0
+  write(OUT2, '(F10.3)') t1 - t0
 
   !call mpi_type_free(vec_type, ierror)
 
@@ -373,6 +378,7 @@ program qa
   !close(IN2)
   close(PARAM)
   close(OUT)
+  close(OUT2)
 
 contains
 
@@ -440,7 +446,7 @@ contains
       count = count + 1
     end do
     100 close(in)
-    !print * ,count
+    print * ,count
 
   end subroutine init_coupling
 
