@@ -15,6 +15,10 @@ module constants_m
   integer(SI),parameter :: in = 17
   ! in2 : 読み込みファイルのための装置番号
   integer(SI),parameter :: in2 = 18
+  ! in3 : 読み込みファイルのための装置番号
+  integer(SI),parameter :: out = 19
+
+  integer(SI),parameter :: DIV = 5
 
 
 end module constants_m

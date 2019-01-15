@@ -56,11 +56,12 @@ program qa
   ! open file
   open(in, file = "SG.dat", status = 'old')
   open(in2, file = 'Spin_SA.dat', status = 'old')
+  open(out, file = "Params.dat", status = 'replace')
 
   !-------- initialize for qa(rf. roman martonak et al.)------
   ! set mt(m/beta)
   do
-    print * , 'm/beta(1 or 1.5 or 2)'
+    print * , 'm/beta(1 or 1.5 or 2)[default : 1]'
     read(*,*) mt
     if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
       exit
@@ -68,7 +69,7 @@ program qa
   end do
 
   ! read m
-  print *, 'm'
+  print *, 'm(dont set square number for plot)[default :10]'
   read(*,*) m
 
   ! set beta(becaues mt = m  / beta))
@@ -88,7 +89,7 @@ program qa
   ! reset beta(kt = 0.1)
   !  beta = 10
   !reset initial gamma
-  gamma_init = 3
+  gamma_init = 5
   ! set gamma and qa_step
 
   gamma = gamma_init
@@ -116,8 +117,9 @@ program qa
   call init_coupling(j_couple, n, in)
 
   !initialize output file for animation
-  do k = 1,m
-    CALL spndat(-1,spin_old,n,k)
+  tau = -1
+  do k = 1, m
+    call spndat(tau, spin_old, energ_old, k, m, n)
   end do
 
 
@@ -139,7 +141,7 @@ program qa
   !  end do
 
   !======== Quantumn Annealing ========
-  do i = 1, qa_step
+  do tau = 1, qa_step
     ! calculate j_tilda
     j_tilda = -1 / (2 * beta) * log(tanh(beta * gamma / m))
     print *, 'j_tilda', j_tilda
@@ -185,21 +187,25 @@ program qa
     end do
 
     count = 0
-    print *, "qa_step : ", i
+    print *, "qa_step : ", tau
     do k = 1, m
       if (k < m .and. abs(energ_old(k) - energ_old(k + 1)) .le. EPS*1e-4) then
         count = count + 1
       end if
       print *, gamma , energ_old(k)
-      call spndat(i, spin_old, k, m, n)
+      if(mod(tau, DIV) == 0) then
+        call spndat(tau / DIV, spin_old, energ_old, k, m, n)
+      end if
     end do
 
-    if(count .ge. m - 2) then
+    if(count .ge. m - 1) then
+      write(out, '(a,i0)') 'qa_step=', tau/DIV
       deallocate(j_couple)
       deallocate(spin_old, spin_new)
       deallocate(energ_old, energ_new)
       close(in)
       close(in2)
+      close(out)
       stop
     end if
 
@@ -208,11 +214,13 @@ program qa
 
   end do
 
+  write(out, '(i0)') 'qa_step=', tau/DIV
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   deallocate(energ_old, energ_new)
   close(in)
   close(in2)
+  close(out)
 
 contains
 
@@ -249,7 +257,7 @@ contains
         do x = 1, n
           call random_number(tmp)
           spin(x,y,k) = nint(tmp)
-          if (abs(spin(k, x, y)) == 0) then
+          if (abs(spin(x, y, k)) == 0) then
             spin(x, y, k) = -1.0
           end if
         end do
@@ -268,6 +276,7 @@ contains
     integer(SI) :: in
     integer(DI) :: count
 
+    count = 0
     j_couple = 0
 
     do
@@ -313,23 +322,36 @@ contains
     end if
   end subroutine reverse_spin
 
-  subroutine spndat(t,spin, k, m, n)
+  subroutine spndat(tau, spin, energ, k, m, n)
     implicit none
-    integer(SI), intent(in) :: t, k, m, n
+    integer(SI), intent(in) :: n
+    integer(DI), intent(in) :: tau, k, m
     integer(SI), dimension(n,n,m), intent(in) :: spin
+    real(DR), dimension(m), intent(in) :: energ
     integer(SI) :: ix,iy
     integer(SI), parameter :: iw = 5000
-    character(len=48) :: file_name
-    character(len=8) :: file_num
+    character(len=128) :: file_name_spin
+    character(len=128) :: file_name_en
+    character(len=48) :: file_num
 
-    write(file_num,*) k
-    file_name = "./data/spin" // trim(file_num) // ".dat"
+    write(file_num,'(i0)') k
+    if(k < 10) then
+      file_num = '00' // trim(file_num)
+    else if(k < 100) then
+      file_num = '0' // trim(file_num)
+    end if
 
-    if(t.eq.-1) then
-      open(iw,file=file_name,status="replace")
+    file_name_spin = trim("./data/spin") // trim(file_num) // trim(".dat")
+    file_name_en = trim("./data/en") // trim(file_num) // trim(".dat")
+
+    if(tau.eq.-1) then
+      open(iw,file=file_name_spin,status="replace")
+      close(iw)
+      open(iw,file=file_name_en,STATUS="replace")
+      write(iw,*) "# Time        Energy"
       close(iw)
     else
-      open(iw,file=file_name,status="old",position="append")
+      open(iw,file=file_name_spin, status="old", position="append")
       do iy = 1, n
         do ix = 1, n
           write(iw,fmt='(i4, i4, 1x, i4)') ix, iy, spin(ix,iy,k)
@@ -339,6 +361,9 @@ contains
       enddo
       close(iw)
 
+      open(iw,FILE=file_name_en, status="old", position="append")
+      write(iw,*) tau, energ(k)/(n**2)
+      close(iw)
     endif
   end subroutine spndat
 
