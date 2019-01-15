@@ -23,7 +23,7 @@ program make_sg
 
   count = 0
 
-  do while(count .lt. 40000)
+  do while(count .lt. 80000)
 
     call random_number(tmp)
     ix = ceiling(tmp * n)
@@ -56,7 +56,11 @@ program make_sg
       do jx = 1,n
         do jy = 1,n
           if(.not. (abs(j_couple(ix,iy,jx,jy) - (-10.0)) < EPS)) then
-            write(OUT, '(i4, i4, i4, i4, f10.6)') ix, iy, jx, jy, j_couple(ix,iy,jx,jy)
+            if(j_couple(ix,iy,jx,jy) < 0) then
+              write(OUT, '(i0,1x,i0,1x,i0,1x,i0,1x,f9.6)') ix, iy, jx, jy, j_couple(ix,iy,jx,jy)
+            else
+              write(OUT, '(i0,1x,i0,1x,i0,1x,i0,1x,f8.6)') ix, iy, jx, jy, j_couple(ix,iy,jx,jy)
+            end if
           end if
         end do
       end do
