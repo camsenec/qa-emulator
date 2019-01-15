@@ -141,7 +141,7 @@ program qa
   print *, 'alpha', alpha
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
-  !  beta = 10
+  beta = 0.1
   ! reset initial gamma
   !gamma_init = 3
 
@@ -293,14 +293,14 @@ program qa
 
     local_count = 0
     do k = 1, m_sub
-      if (k < m_sub - 1 .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
+      if (k < m_sub  .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
       !for data analysis
       if ((k == 1 .and. myrank == 0) .and. mod(tau, DEV) == 0) then
         call spndat(tau/DEV, spin_old, energ, k, m, n)
       end if
-      print *, gamma , energ(k)
+      print *, beta, gamma , energ(k)
     end do
 
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
@@ -311,7 +311,7 @@ program qa
     end if
 
     !if energ is the same in each slice, make sure energy between the processes is the same
-     !if(global_count .ge. (m_sub - 1) * nprocs) then
+     if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
 
@@ -354,11 +354,13 @@ program qa
         stop
 
       end if
-
+    end if
 
     ! update gamma
-    gamma = 0.999*gamma
-
+    if(tau > 400) then
+      gamma = 0.99*gamma
+    endif 
+    beta = 0.1 * 1.005**(tau)  
   end do
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)

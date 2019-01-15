@@ -52,10 +52,10 @@ program sa
 
   ! read n, kt, kt_fin from commandline
 
-  print * , 'sa_step(default : 600000)'
-  read(*, *) sa_step
-  print * , 'kt_init(default : 5)'
-  read(*, *) kt_init
+  !print * , 'sa_step(default : 600000)'
+  !read(*, *) sa_step
+  !print * , 'kt_init(default : 5)'
+  !read(*, *) kt_init
 
   read(IN,*) n
   allocate(j_couple(n,n,n,n))
@@ -63,6 +63,9 @@ program sa
   allocate(spin_b(n,n))
   allocate(result_e(data_devide))
   allocate(result_m(data_devide))
+
+  sa_step=600000
+  kt_init=5
 
   ! initialize output file
   t = -1
