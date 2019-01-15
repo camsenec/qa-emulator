@@ -54,7 +54,7 @@ program qa
   !======== initialize ========
   !-------- initialize for io-------
   ! open file
-  open(in, file = "SG.dat", status = 'old')
+  open(in, file = "SG_complex.dat", status = 'old')
   open(in2, file = 'Spin_SA.dat', status = 'old')
   open(out, file = "Params.dat", status = 'replace')
 
