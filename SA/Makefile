@@ -1,7 +1,7 @@
 .PHONY: main view clean
 
-FC = gfortran
-#FC = ifort
+
+FC = ifort
 #dplace ./spinglass
 
 .SUFFIXES: .f90 .o
@@ -14,7 +14,7 @@ OBJS = constants.o \
 			 sa.o
 
 main:sa
-	./sa
+	dplace ./sa
 
 sa: $(OBJS)
 	$(FC) $(OBJS) -o sa

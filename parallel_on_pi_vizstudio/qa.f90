@@ -50,7 +50,7 @@ program qa
   ! gamma : アニーリング係数
   real(DR) :: gamma, gamma_init
   ! beta : 逆温度
-  real(DR) :: beta
+  real(DR) :: beta, beta_init
   ! m : トロッター数, k : 各スライス
   integer(SI) :: m, m_sub, k
   ! mt : m/beta
@@ -58,13 +58,13 @@ program qa
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
   real(DR) :: alpha
+  real(DR) :: r_beta, r_gamma
 
   !--------parameter for parallel processing--------
   integer(SI) :: myrank, nprocs, ierror
   integer(SI) :: status(MPI_STATUS_SIZE)
   integer(SI) :: lower, upper
   integer(SI) :: local_count, global_count
-  !t0 : 並列リージョン突入時間, t1 : 並列リージョン離脱時間
   real(DR) :: t0, t1
 
   !--------initialize MPI--------
@@ -111,7 +111,8 @@ program qa
   !  print *, 'initial gamma'
   !  read(*,*) gamma_init
   !  set n
-     read(IN,*) n
+
+  read(IN,*) n
 
   !end if
 
@@ -123,28 +124,19 @@ program qa
   call mpi_bcast(n, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
   call mpi_bcast(gamma_init, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
 
-  !--------read parameter(rf. roman martonak et al.)------
-  ! set beta(becaues mt = m  / beta))
-  beta = m / mt
 
-  ! set initial gamma
-  if (abs(mt-1) < EPS) then
-    !gamma_init = 3
-  else
-    !gamma_init = 2.5
-  end if
+  !-------- parameter for scheduling------
+  !read(PARAM,*) beta_init, r_beta, r_gamma
+  beta_init = 0.2
+  r_beta = 1.01
+  r_gamma = 1.005
 
-  ! set gamma and qa_step
-  gamma = gamma_init
-  qa_step = 500000 / n*n
-  alpha = (1e-8/dble(gamma_init))**(1/dble(qa_step))
-  print *, 'alpha', alpha
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
-  !  beta = 10
-  ! reset initial gamma
-  !gamma_init = 3
-
+  beta = beta_init
+  !reset initial gamma
+  gamma = INF
+  ! set gamma and qa_step
 
   !-------- parameter for parallel processing------
   !define subdomain
@@ -285,22 +277,23 @@ program qa
       energ(k) = energ_sa(j_couple, spin_old, k, m_sub, n)
     end do
 
-    !end judge and check state of each slice
-    !if energy between adjacent slice is the same , increment local_count
     if(myrank == 0) then
       print * , "qa_step : ", tau
     end if
 
+
+    ! end judge and check state of each slice
+    ! [END JUDGE1] if energy between adjacent slice is the same , increment local_count
     local_count = 0
     do k = 1, m_sub
-      if (k < m_sub - 1 .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
+      if (k < m_sub  .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
       !for data analysis
       if ((k == 1 .and. myrank == 0) .and. mod(tau, DEV) == 0) then
         call spndat(tau/DEV, spin_old, energ, k, m, n)
       end if
-      print *, gamma , energ(k)
+      print *, beta, gamma , energ(k)
     end do
 
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
@@ -310,8 +303,8 @@ program qa
       print *, "global_count", global_count
     end if
 
-    !if energ is the same in each slice, make sure energy between the processes is the same
-     !if(global_count .ge. (m_sub - 1) * nprocs) then
+    ![END JUDGE2] if energ is the same in each slice, make sure energy between the processes is the same
+     if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
 
@@ -324,6 +317,7 @@ program qa
         local_count = local_count + 1
       end if
 
+      !reduce local_count to global_count
       call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
         MPI_COMM_WORLD, ierror)
 
@@ -331,7 +325,7 @@ program qa
         print *, "global_count2", global_count
       end if
 
-      !end program
+      ![END PROGRAM] if global_count >= nprocs, end program
       if (global_count .ge. nprocs) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
@@ -341,6 +335,7 @@ program qa
           write(OUT2, '(F10.3)') t1 - t0
         end if
 
+        !output time
         print *, "time : ", t1 - t0
 
         !call mpi_type_free(vec_type, ierror)
@@ -354,13 +349,23 @@ program qa
         stop
 
       end if
+    end if
 
 
-    ! update gamma
-    gamma = 0.999*gamma
-
+    if(beta < m) then
+      gamma = INF
+      beta = beta_init * r_beta**tau
+    else
+      if(abs(gamma - INF) < EPS) then
+        tau_eq = tau
+        gamma = gamma_init
+      end if
+      gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+    end if
+    
   end do
 
+  !end program
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   t1 = mpi_wtime()
 

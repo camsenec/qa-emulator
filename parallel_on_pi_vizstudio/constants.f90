@@ -9,6 +9,7 @@ module constants_m
 
   ! << Mathematical constants >
   real(DR), parameter :: EPS = 1e-5
+  integer(DR), parameter :: INF = 1e+5
 
   ! <<IO constants >
   ! in : 読み込みファイルのための装置番号
@@ -21,7 +22,7 @@ module constants_m
 
   ! <<MPI constants >
   integer(SI),parameter :: ROOT = 0
-  
+
   integer(SI),parameter :: DEV = 5
 
 

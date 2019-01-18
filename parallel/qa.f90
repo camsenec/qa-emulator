@@ -278,7 +278,7 @@ program qa
     end do
 
     !end judge and check state of each slice
-    !if energy between adjacent slice is the same , increment local_count
+    ![END JUDGE1] if energy between adjacent slice is the same , increment local_count
     if(myrank == 0) then
       print * , "qa_step : ", tau
     end if
@@ -295,14 +295,17 @@ program qa
       print *, gamma , energ(k)
     end do
 
+    !recuce local_count to global_count
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
 
+    !output global_count
     if(myrank == 0) then
       print *, "global_count", global_count
     end if
 
-    !if energ is the same in each slice, make sure energy between the processes is the same
+
+    !![END JUDGE 2] if energ is the same in each slice, make sure energy between the processes is the same
     if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
@@ -316,14 +319,16 @@ program qa
         local_count = local_count + 1
       end if
 
+      !reduce local_count to global_count
       call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
         MPI_COMM_WORLD, ierror)
 
+      !output global_count
       if(myrank == 0) then
         print *, "global_count2", global_count
       end if
 
-      !end program
+      ![END PRGRAM] if(global_count > nprocs - 2) stop program
       if (global_count .ge. nprocs - 2) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
@@ -335,11 +340,10 @@ program qa
         deallocate(j_couple)
         deallocate(spin_old, spin_new)
         close(IN)
-      !  close(IN2)
+        !close(IN2)
         stop
 
       end if
-
     end if
 
     ! update gamma

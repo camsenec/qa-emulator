@@ -43,13 +43,15 @@ program qa
   ! gamma : アニーリング係数
   real(DR) :: gamma, gamma_init
   ! beta : 逆温度
-  real(DR) :: beta
+  real(DR) :: beta, beta_init
   ! m : トロッター数, k : 各スライス
   integer(DI) :: m, k
   ! mt : m/beta
   real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
+  ! r : 冷却率
+  real(DR) :: r_beta, r_gamma
 
   !======== initialize ========
   !-------- initialize for io-------
@@ -89,14 +91,19 @@ program qa
   ! set n
   read(in,*) n
 
+  !-------- parameter for scheduling------
+  !read(PARAM,*) beta_init, r_beta, r_gamma
+  beta_init = 0.2
+  r_beta = 1.01
+  r_gamma = 1.005
+
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
-  !  beta = 10
+  beta = beta_init
   !reset initial gamma
-  !gamma_init = 5
+  gamma = INF
   ! set gamma and qa_step
 
-  gamma = gamma_init
   qa_step = 400000 / n*n
 
   print *, 'beta:', beta
@@ -196,7 +203,7 @@ program qa
       if (k < m .and. abs(energ_old(k) - energ_old(k + 1)) .le. EPS*1e-4) then
         count = count + 1
       end if
-      print *, gamma , energ_old(k)
+      print *, beta, gamma , energ_old(k)
       if(mod(tau, DIV) == 0) then
         call spndat(tau / DIV, spin_old, energ_old, k, m, n)
       end if
@@ -212,8 +219,22 @@ program qa
       close(out)
       stop
     end if
+
+    !! update gamma and beta
+    ! need to set r_gamma, r_beta
+    ! update beta
     ! update gamma
-    gamma = gamma * 0.99
+
+    if(beta < m) then
+      gamma = INF
+      beta = beta_init * r_beta**tau
+    else
+      if(abs(gamma - INF) < EPS) then
+        tau_eq = tau
+        gamma = gamma_init
+      end if
+      gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+    end if
 
   end do
 

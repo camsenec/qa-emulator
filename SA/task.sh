@@ -2,9 +2,9 @@
 
 I=0
 
-while [ ${I} -lt 1000 ]
+while [ ${I} -lt 100 ]
 do
-  ./spinglass
+  ./sa
   I=$((${I}+1))
   echo $I
 done
