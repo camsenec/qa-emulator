@@ -67,3 +67,4 @@ do
 
   I=$(expr $I + 1)
 done
+echo "pause -1"

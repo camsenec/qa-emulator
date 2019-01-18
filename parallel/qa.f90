@@ -17,7 +17,7 @@ program qa
   integer(SI) :: tmp
   ! tau : モンテカルロステップ数
   integer(DI) :: tau
-    ! n : 1スライスにおけるサイト数
+  ! n : 1スライスにおけるサイト数
   integer(SI) :: n
   !x:サイトのx座標, y:サイトのy座標
   integer(SI) :: x, y
@@ -50,20 +50,21 @@ program qa
   ! gamma : アニーリング係数
   real(DR) :: gamma, gamma_init
   ! beta : 逆温度
-  real(DR) :: beta
+  real(DR) :: beta, beta_init
   ! m : トロッター数, k : 各スライス
   integer(SI) :: m, m_sub, k
   ! mt : m/beta
   real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
+  real(DR) :: alpha
+  real(DR) :: r_beta, r_gamma
 
   !--------parameter for parallel processing--------
   integer(SI) :: myrank, nprocs, ierror
   integer(SI) :: status(MPI_STATUS_SIZE)
   integer(SI) :: lower, upper
   integer(SI) :: local_count, global_count
-  !t0 : 並列リージョン突入時間, t1 : 並列リージョン離脱時間
   real(DR) :: t0, t1
 
   !--------initialize MPI--------
@@ -79,36 +80,42 @@ program qa
 
   !======== initialize parameter ========
   !-------- initialize for io-------
-  ! open file
-  open(IN, file = "SG.dat", status = 'old')
-  !open(IN2, file = 'Spin_SA.dat', status = 'old')
+  ! open filei
+  open(IN, file = "SG_complex.dat", status = 'old')
+  open(PARAM, file = "paramIn.dat", status = 'old')
+  open(OUT,file = 'data.dat', status = 'old', position = 'append')
+
+  open(OUT2,file = 'time.dat', status = 'old', position = 'append')
 
   !--------read parameter(rf. roman martonak et al.)------
-  if (myrank == 0) then
+  !if (myrank == 0) then
     ! set mt(m/beta)
-    do
-      print * , 'm/beta(1 or 1.5 or 2)'
-      read(*,*) mt
-      if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
-        exit
-      end if
-    end do
+  !  do
+  !    print * , 'm/beta(1 or 1.5 or 2)'
+  !    read(*,*) mt
+  !    if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
+  !      exit
+  !    end if
+  !  end do
 
     ! set m
-    do
-      print * , 'm (must : m mod nprocs = 0)'
-      read(*,*) m
-      if (mod(m,nprocs) == 0) then
-        exit
-      end if
-    end do
+  !  do
+  !    print * , 'm (must : m mod nprocs = 0)'
+  !    read(*,*) m
+  !    if (mod(m,nprocs) == 0) then
+  !      exit
+  !    end if
+  !  end do
 
-    print *, 'initial gamma'
-    read(*,*) gamma_init
-    ! set n
-    read(IN,*) n
+  !  print *, 'initial gamma'
+  !  read(*,*) gamma_init
+  !  set n
 
-  end if
+  read(IN,*) n
+
+  !end if
+
+  read(PARAM,*) mt, m, gamma_init
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   call mpi_bcast(mt, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
@@ -116,32 +123,25 @@ program qa
   call mpi_bcast(n, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
   call mpi_bcast(gamma_init, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
 
-  !--------read parameter(rf. roman martonak et al.)------
-  ! set beta(becaues mt = m  / beta))
-  beta = m / mt
 
-  ! set initial gamma
-  if (abs(mt-1) < EPS) then
-    !gamma_init = 3
-  else
-    !gamma_init = 2.5
-  end if
-
-  ! set gamma and qa_step
-  gamma = gamma_init
-  qa_step = 500000 / n*n
+  !-------- parameter for scheduling------
+  !read(PARAM,*) beta_init, r_beta, r_gamma
+  beta_init = 0.2
+  r_beta = (m / beta_init)**(1.0/300000)
+  r_gamma = 1.0001
 
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
-  !  beta = 10
-  ! reset initial gamma
-  !gamma_init = 3
-
+  beta = beta_init
+  !reset initial gamma
+  gamma = INF
+  ! set gamma and qa_step
 
   !-------- parameter for parallel processing------
   !define subdomain
   !(m / nprocs) trotter slices are allocated to each rank
   m_sub = m / nprocs
+  qa_step = 500000 / n*n
 
   !set rank of upper subdomain
   if(myrank == 0) then
@@ -186,23 +186,6 @@ program qa
 
   tau = -1
   call spndat(tau, spin_old, energ, k, m, n)
-
-  !======== Preannealing with SA ========
-  ! do
-  !   read(IN2,*,end=100) x, y, k, tmp
-  !   spin_old(x,y,k) = tmp
-  !   count = count + 1
-  ! end do
-  ! 100 close(IN2)
-
-  !  do k =  1, m
-  !   energ_old(k) = energ_sa(j_couple, spin_old, k, m, n)
-  !  end do
-
-  ! output energy of each slice
-  !  do k = 1, m
-  !    print *, energ_old(k)
-  !  end do
 
   !======== Quantumn Annealing ========
 
@@ -277,36 +260,34 @@ program qa
       energ(k) = energ_sa(j_couple, spin_old, k, m_sub, n)
     end do
 
-    !end judge and check state of each slice
-    ![END JUDGE1] if energy between adjacent slice is the same , increment local_count
     if(myrank == 0) then
       print * , "qa_step : ", tau
     end if
 
+
+    ! end judge and check state of each slice
+    ! [END JUDGE1] if energy between adjacent slice is the same , increment local_count
     local_count = 0
     do k = 1, m_sub
-      if (k < m_sub .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
+      if (k < m_sub  .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
       !for data analysis
       if ((k == 1 .and. myrank == 0) .and. mod(tau, DEV) == 0) then
         call spndat(tau/DEV, spin_old, energ, k, m, n)
       end if
-      print *, gamma , energ(k)
+      print *, beta, gamma , energ(k)
     end do
 
-    !recuce local_count to global_count
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
 
-    !output global_count
     if(myrank == 0) then
       print *, "global_count", global_count
     end if
 
-
-    !![END JUDGE 2] if energ is the same in each slice, make sure energy between the processes is the same
-    if(global_count .ge. (m_sub - 1) * nprocs) then
+    ![END JUDGE2] if energ is the same in each slice, make sure energy between the processes is the same
+     if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
 
@@ -323,16 +304,21 @@ program qa
       call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
         MPI_COMM_WORLD, ierror)
 
-      !output global_count
       if(myrank == 0) then
         print *, "global_count2", global_count
       end if
 
-      ![END PRGRAM] if(global_count > nprocs - 2) stop program
-      if (global_count .ge. nprocs - 2) then
+      ![END PROGRAM] if global_count >= nprocs, end program
+      if (global_count .ge. nprocs) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
 
+        if(myrank == 0) then
+          write(OUT,*) minval(energ)
+          write(OUT2, '(F10.3)') t1 - t0
+        end if
+
+        !output time
         print *, "time : ", t1 - t0
 
         !call mpi_type_free(vec_type, ierror)
@@ -340,21 +326,36 @@ program qa
         deallocate(j_couple)
         deallocate(spin_old, spin_new)
         close(IN)
-        !close(IN2)
+      !  close(IN2)
+        close(PARAM)
+        close(OUT)
         stop
 
       end if
     end if
 
-    ! update gamma
-    gamma = 0.99*gamma
 
+    if(beta < m) then
+      gamma = INF
+      beta = beta_init * r_beta**(tau*n*n)
+    else
+      if(abs(gamma - INF) < EPS) then
+        tau_eq = tau
+        gamma = gamma_init
+      end if
+      if(gamma > 1e-12) then
+        gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+      end if
+    end if
+    
   end do
 
+  !end program
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   t1 = mpi_wtime()
 
   print *, "time : ", t1 - t0
+  write(OUT2, '(F10.3)') t1 - t0
 
   !call mpi_type_free(vec_type, ierror)
 
@@ -362,6 +363,9 @@ program qa
   deallocate(spin_old, spin_new)
   close(IN)
   !close(IN2)
+  close(PARAM)
+  close(OUT)
+  close(OUT2)
 
 contains
 
@@ -429,7 +433,7 @@ contains
       count = count + 1
     end do
     100 close(in)
-    !print * ,count
+    print * ,count
 
   end subroutine init_coupling
 
@@ -506,7 +510,7 @@ contains
     integer(SI), parameter :: iw = 5000
     character(len=128) :: file_name
 
-    file_name = trim('./data/en.dat')
+    file_name = trim('data/en.dat')
 
     if(tau.eq.-1) then
       open(iw,file=file_name,STATUS="replace")
