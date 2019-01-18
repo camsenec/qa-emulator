@@ -80,9 +80,8 @@ program qa
 
   !======== initialize parameter ========
   !-------- initialize for io-------
-  ! open file
+  ! open filei
   open(IN, file = "SG_complex.dat", status = 'old')
-  !open(IN2, file = 'Spin_SA.dat', status = 'old')
   open(PARAM, file = "paramIn.dat", status = 'old')
   open(OUT,file = 'data.dat', status = 'old', position = 'append')
 
@@ -128,8 +127,8 @@ program qa
   !-------- parameter for scheduling------
   !read(PARAM,*) beta_init, r_beta, r_gamma
   beta_init = 0.2
-  r_beta = 1.01
-  r_gamma = 1.005
+  r_beta = (m / beta_init)**(1.0/300000)
+  r_gamma = 1.0001
 
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
@@ -142,6 +141,7 @@ program qa
   !define subdomain
   !(m / nprocs) trotter slices are allocated to each rank
   m_sub = m / nprocs
+  qa_step = 500000 / n*n
 
   !set rank of upper subdomain
   if(myrank == 0) then
@@ -186,23 +186,6 @@ program qa
 
   tau = -1
   call spndat(tau, spin_old, energ, k, m, n)
-
-  !======== Preannealing with SA ========
-  ! do
-  !   read(IN2,*,end=100) x, y, k, tmp
-  !   spin_old(x,y,k) = tmp
-  !   count = count + 1
-  ! end do
-  ! 100 close(IN2)
-
-  !  do k =  1, m
-  !   energ_old(k) = energ_sa(j_couple, spin_old, k, m, n)
-  !  end do
-
-  ! output energy of each slice
-  !  do k = 1, m
-  !    print *, energ_old(k)
-  !  end do
 
   !======== Quantumn Annealing ========
 
@@ -354,13 +337,15 @@ program qa
 
     if(beta < m) then
       gamma = INF
-      beta = beta_init * r_beta**tau
+      beta = beta_init * r_beta**(tau*n*n)
     else
       if(abs(gamma - INF) < EPS) then
         tau_eq = tau
         gamma = gamma_init
       end if
-      gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+      if(gamma > 1e-12) then
+        gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+      end if
     end if
     
   end do
