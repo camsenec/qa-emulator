@@ -8,8 +8,8 @@ program sa
   ! ---------parameter for spinglass and general---------
   ! n : 1行(1列)あたりのサイト数
   integer(SI) ::  n, x, y
-  ! t : モンテカルロステップ数
-  integer(DI) :: t, i
+  ! tau : モンテカルロステップ数
+  integer(DI) :: tau, i
   ! spin_a(:): 繊維前の状態,  spin_b(:): 遷移したとしたときの状態
   integer(SI), allocatable, dimension(:,:) :: spin_a, spin_b
   ! energ_a : 繊維前のエネルギー, energ_b : 遷移したとしたときのエネルギー
@@ -32,15 +32,16 @@ program sa
   ! --------parameter for sa(simulated annealing)--------
   ! sa_step : saのステップ数
   integer(DI) :: sa_step
-  ! kt : 温度, beta : 逆温度
-  real(DR) :: kt, beta
-  ! kt_init : 初期温度
-  real(DR) :: kt_init
-  ! kt_fin : 最終温度
-  real(DR) :: kt_fin
+  ! beta : 逆温度
+  real(DR) :: beta
+  ! kt_init : 初期逆温度
+  real(DR) :: beta_init
+  ! kt_fin : 最終逆温度
+  real(DR) :: beta_fin
   ! alpha : 冷却率
   real(DR) :: alpha
 
+  integer t1, t2, t_rate, t_max, diff
   ! ======== initialize ========
   ! open file
   open(OUT,file = 'data.dat',status = 'old', position = 'append')
@@ -64,12 +65,9 @@ program sa
   allocate(result_e(data_devide))
   allocate(result_m(data_devide))
 
-  sa_step=600000
-  kt_init=5
-
   ! initialize output file
-  t = -1
-  call spndat(t,spin_a,n,energ_a)
+  tau = -1
+  call spndat(tau,spin_a,n,energ_a)
 
   ! initialize spin & energ_b
   call init_sg(spin_a,n)
@@ -81,18 +79,17 @@ program sa
   energ_a = energ(j_couple, spin_a, n)
 
   ! set kt, kt_fin , alpha
-  kt = kt_init
-  kt_fin = EPS
-  alpha = (kt_fin/dble(kt_init))**(1/dble(sa_step))
+  sa_step=300000
+  beta_init = 0.2
+  beta = beta_init
+  beta_fin = 48
+  alpha = (beta_fin/dble(beta_init))**(1/dble(sa_step))
   print * , "alpha", alpha
 
+  call system_clock(t1)   ! 開始時を記録
+
   ! ======== monte-carlo simulation ========
-  do t = 1, sa_step
-    if(kt == 0) then
-      beta = 1e5
-    else
-      beta = 1/dble(kt)
-    endif
+  do tau = 1, sa_step
 
     !select updated site
     call choose(site_x, site_y, n)
@@ -127,25 +124,35 @@ program sa
     m = sum(spin_a) / dble(size(spin_a))
 
     !contain value of energ and m^2 IN array
-    result_e(mod(t,data_devide) + 1) = energ_a
-    result_m(mod(t,data_devide) + 1) = m**2
+    result_e(mod(tau,data_devide) + 1) = energ_a
+    result_m(mod(tau,data_devide) + 1) = m**2
 
     !output expected value every 1000 sample to file
-    if (mod(t,data_devide) == 0) then
+    if (mod(tau,data_devide) == 0) then
       expected_e = sum(result_e) / size(result_e)
       expected_m = sum(result_m) / size(result_m)
-      print * , kt, t, expected_e
-      print * , kt, t, expected_m
+      print * , beta, tau, expected_e
+      print * , beta, tau, expected_m
 
       !output for animation
-      i = int(t/data_devide)
+      i = int(tau/data_devide)
       call spndat(i,spin_a,n,expected_e)
     endif
 
     !update temparature
-    kt = alpha**t * kt_init
+    beta = beta_init * alpha**tau
 
   enddo
+
+  open(20,file = "time.dat", status = "old",position = "append")
+  call system_clock(t2, t_rate, t_max)   ! 終了時を記録
+  if ( t2 < t1 ) then
+    diff = (t_max - t1) + t2 + 1
+  else
+    diff = t2 - t1
+  endif
+  write(20, '(F10.3)') diff/dble(t_rate)
+  close(20)
 
   write(OUT,fmt = '(f0.9, f13.9)') expected_e, expected_m
 

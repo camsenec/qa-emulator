@@ -9,12 +9,12 @@ FC = ifort
 .f90.o:
 	$(FC) $(FFLAGS) -c $<
 
-OBJS = constants.o \
-			 calc_energ.o \
-			 sa.o
+OBJS =  constants.o \
+	calc_energ.o \
+	sa.o
 
 main:sa
-	dplace ./sa
+	 ./sa
 
 sa: $(OBJS)
 	$(FC) $(OBJS) -o sa
@@ -27,7 +27,7 @@ task:result spinglass
 	cat /dev/null > time.dat
 	chmod 755 task.sh
 	./task.sh
-	./result
+	./result >> log.txt
 
 result:result.f90
 	$(FC) result.f90 -o result

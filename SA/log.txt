@@ -1,0 +1,6 @@
+ trial         100
+ mean_energ  -2420.36173995305     
+ std_energ   27.8006875728382     
+ trial         200
+ mean_time  0.334420000000000     
+ std_time  0.335269880939709     
