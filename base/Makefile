@@ -21,7 +21,7 @@ pimc: $(OBJS)
 
 graph:
 	chmod 755 make_gif.sh
-	./make_gif.sh Params.dat > make_gif.gp
+	./make_gif.sh qa_step.dat > make_gif.gp
 	gnuplot make_gif.gp
 
 view:
