@@ -32,10 +32,10 @@ program sa
   ! --------parameter for sa(simulated annealing)--------
   ! sa_step : saのステップ数
   integer(DI) :: sa_step
-  ! kt : 温度, beta : 逆温度
-  real(DR) :: kt, beta
+  !beta : 逆温度, beta_init: 初期逆温度
+  real(DR) :: beta_init
   ! kt_init : 初期温度
-  real(DR) :: kt_init
+  real(DR) :: beta_init
   ! kt_fin : 最終温度
   real(DR) :: kt_fin
   ! alpha : 冷却率

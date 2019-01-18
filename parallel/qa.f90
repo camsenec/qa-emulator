@@ -43,8 +43,8 @@ program qa
   integer(SI) :: site_x, site_y
 
   !--------parameter for QA--------
-  ! qa_step : 量子モンテカルロステップ数
-  integer(DI) :: qa_step
+  ! qa_step : 量子アニーリングテップ数, sa_step : 古典アニーリングステップ数
+  integer(DI) :: qa_step, sa_step
   ! j_tilda : トロッタースライスごとの相互作用におけるカップリング
   real(DR) :: j_tilda
   ! gamma : アニーリング係数
@@ -57,7 +57,7 @@ program qa
   real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
-  real(DR) :: alpha
+  !r_beta, r_gamma : beta, gammaの冷却率
   real(DR) :: r_beta, r_gamma
 
   !--------parameter for parallel processing--------
@@ -84,10 +84,9 @@ program qa
   open(IN, file = "SG_complex.dat", status = 'old')
   open(PARAM, file = "paramIn.dat", status = 'old')
   open(OUT,file = 'data.dat', status = 'old', position = 'append')
-
   open(OUT2,file = 'time.dat', status = 'old', position = 'append')
 
-  !--------read parameter(rf. roman martonak et al.)------
+  !--------set parameter(rf. roman martonak et al.)------
   !if (myrank == 0) then
     ! set mt(m/beta)
   !  do
@@ -110,38 +109,44 @@ program qa
   !  print *, 'initial gamma'
   !  read(*,*) gamma_init
   !  set n
-
-  read(IN,*) n
-
   !end if
 
-  read(PARAM,*) mt, m, gamma_init
+  !-------- parameter set for spinglass------
+  ! set n
+  read(in,*) n
 
-  call mpi_barrier(MPI_COMM_WORLD, ierror)
-  call mpi_bcast(mt, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
-  call mpi_bcast(m, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
-  call mpi_bcast(n, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
-  call mpi_bcast(gamma_init, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
-
-
-  !-------- parameter for scheduling------
-  !read(PARAM,*) beta_init, r_beta, r_gamma
+  !-------- parameter set for scheduling------
+  sa_step = 300000
+  qa_step = 500000 / n*n
   beta_init = 0.2
+  gamma_init = 3
   r_beta = (m / beta_init)**(1.0/300000)
   r_gamma = 1.0001
 
-  !-------- parameter reset------
-  ! reset beta(kt = 0.1)
+  if(myrank == 0) then
+    print * , "r_beta"
+    read(*,*) r_beta
+    print *, "r_gamma"
+    read(*,*) r_gamma
+    print *, 'm(dont set square number for plot)[default :10]'
+    read(*,*) m
+  end if
+
+  call mpi_barrier(MPI_COMM_WORLD, ierror)
+  call mpi_bcast(r_beta, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
+  call mpi_bcast(r_gamma, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
+  call mpi_bcast(m, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
+
+  !-------- parameter set for qa------
+  ! set beta(kt = 0.1)
   beta = beta_init
-  !reset initial gamma
+  !set initial gamma
   gamma = INF
-  ! set gamma and qa_step
 
   !-------- parameter for parallel processing------
   !define subdomain
   !(m / nprocs) trotter slices are allocated to each rank
   m_sub = m / nprocs
-  qa_step = 500000 / n*n
 
   !set rank of upper subdomain
   if(myrank == 0) then
@@ -166,10 +171,7 @@ program qa
     print *, "myrank : ", myrank
   end if
 
-  !call mpi_type_vector(n, n, n, MPI_INTEGER, vec_type, ierror)
-  !call mpi_type_commit(vec_type, ierror)
-
-  !-------- initialize for spinglass field------
+  !-------- initialize for spinglass ------
 
   ! allocat memorye
   allocate(spin_old(n,n,m_sub + 1))
@@ -347,7 +349,7 @@ program qa
         gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
       end if
     end if
-    
+
   end do
 
   !end program
