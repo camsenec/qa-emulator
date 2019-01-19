@@ -36,8 +36,8 @@ program qa
   integer(SI) :: site_x, site_y
 
   !--------parameter for qa--------
-  ! qa_step : 量子モンテカルロステップ数
-  integer(DI) :: qa_step
+  ! qa_step : 量子アニーリングステップ数, sa_step : 古典アニーリングステップ数
+  integer(DI) :: qa_step, sa_step
   ! j_tilda : トロッタースライスごとの相互作用におけるカップリング
   real(DR) :: j_tilda
   ! gamma : アニーリング係数
@@ -46,71 +46,77 @@ program qa
   real(DR) :: beta, beta_init
   ! m : トロッター数, k : 各スライス
   integer(DI) :: m, k
-  ! mt : m/beta
-  real(DR) :: mt
   ! tau_eq : tau > tau_eqのときにスライス間に横磁場を発生させる（スライス間の相互作用を考える)
   real(DR) :: tau_eq
-  ! r : 冷却率
+  ! r_beta, r_gamma : beta, gammaの冷却率
   real(DR) :: r_beta, r_gamma
 
   !======== initialize ========
   !-------- initialize for io-------
   ! open file
   open(in, file = "SG_complex.dat", status = 'old')
-  open(in2, file = 'Spin_SA.dat', status = 'old')
   open(out, file = "Params.dat", status = 'replace')
 
-  !-------- initialize for qa(rf. roman martonak et al.)------
+  !-------- parameter for qa(rf. roman martonak et al.)------
   ! set mt(m/beta)
-  do
-    print * , 'm/beta(1 or 1.5 or 2)[default : 1]'
-    read(*,*) mt
-    if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
-      exit
-    end if
-  end do
+  !do
+  !  print * , 'm/beta(1 or 1.5 or 2)[default : 1]'
+  !  read(*,*) mt
+  !  if ((abs(mt-1) < EPS .or. abs(mt-1.5) < EPS) .or. (abs(mt-2) < EPS)) then
+  !    exit
+  !  end if
+  !end do
+
+  ! read m
+  !print *, 'm(dont set square number for plot)[default :10]'
+  !read(*,*) m
+
+  !print *, 'initial gamma'
+  !read(*,*) gamma_init
+
+
+  ! set beta(becaues mt = m  / beta))
+  !beta = m / mt
+
+  ! set initial gamma
+  !if (abs(mt-1) < EPS) then
+    !gamma_init = 3
+  !else
+    !gamma_init = 2.5
+  !end if
+
+  !-------- parameter set for  spinglass------
+  ! set n
+  read(in,*) n
+
+  !-------- parameter set for scheduling------
+  sa_step = 300000
+  qa_step = 500000 / n*n
+  beta_init = 0.2
+  gamma_init = 3
+  r_beta = (m / beta_init)**(1.0/300000)
+  r_gamma = 1.0001
 
   ! read m
   print *, 'm(dont set square number for plot)[default :10]'
   read(*,*) m
+  print * , "r_beta"
+  read(*,*) r_beta
+  print *, "r_gamma"
+  read(*,*) r_gamma
 
-  print *, 'initial gamma'
-  read(*,*) gamma_init
-
-
-  ! set beta(becaues mt = m  / beta))
-  beta = m / mt
-
-  ! set initial gamma
-  if (abs(mt-1) < EPS) then
-    !gamma_init = 3
-  else
-    !gamma_init = 2.5
-  end if
-
-  ! set n
-  read(in,*) n
-
-  !-------- parameter for scheduling------
-  !read(PARAM,*) beta_init, r_beta, r_gamma
-  beta_init = 0.2
-  r_beta = 1.01
-  r_gamma = 1.005
-
-  !-------- parameter reset------
-  ! reset beta(kt = 0.1)
+  !-------- parameter set for qa------
+  ! set beta(kt = 0.1)
   beta = beta_init
-  !reset initial gamma
+  !set initial gamma
   gamma = INF
-  ! set gamma and qa_step
-
-  qa_step = 400000 / n*n
 
   print *, 'beta:', beta
   print *, 'initial_gamma:', gamma_init
   print *, 'qa_step:', qa_step
 
-  !-------- initialize for spinglass and general------
+
+  !-------- initialize --------
   ! set random seed
   call rnd_seed
 
@@ -132,24 +138,6 @@ program qa
   do k = 1, m
     call spndat(tau, spin_old, energ_old, k, m, n)
   end do
-
-
-  !======== Preannealing with SA ========
-  ! do
-  !   read(in2,*,end=100) x, y, k, tmp
-  !   spin_old(x,y,k) = tmp
-  !   count = count + 1
-  ! end do
-  ! 100 close(in2)
-
-  !  do k =  1, m
-  !   energ_old(k) = energ_sa(j_couple, spin_old, k, m, n)
-  !  end do
-
-  ! output energy of each slice
-  !  do k = 1, m
-  !    print *, energ_old(k)
-  !  end do
 
   !======== Quantumn Annealing ========
   do tau = 1, qa_step
@@ -233,7 +221,9 @@ program qa
         tau_eq = tau
         gamma = gamma_init
       end if
-      gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+      if(gamma > 1e-12) then
+        gamma = gamma_init * exp(-r_gamma**(tau - tau_eq))
+      end if
     end if
 
   end do
@@ -243,7 +233,6 @@ program qa
   deallocate(spin_old, spin_new)
   deallocate(energ_old, energ_new)
   close(in)
-  close(in2)
   close(out)
 
 contains

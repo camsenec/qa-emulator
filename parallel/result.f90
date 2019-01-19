@@ -2,7 +2,7 @@
       implicit none
       integer,parameter::in = 17, in2 = 18
       integer :: i, n_trial
-      real*8,allocatable::energ(:), time(:)
+      real*8,allocatable::energ(:),time(:)
       real*8 sum, mean
 
       i = 1
@@ -44,6 +44,7 @@
       deallocate(energ)
 
 
+      i = 1
       do
         read(in2,*,end=200) time(i)
         i = i + 1

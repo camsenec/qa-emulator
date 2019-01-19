@@ -6,7 +6,7 @@ do
   : > data.dat
   : > time.dat
   i=0
-  while [ $i -lt 45 ]
+  while [ $i -lt 10 ]
   do
     make
     i=$(expr $i + 1)

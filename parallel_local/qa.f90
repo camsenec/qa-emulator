@@ -102,6 +102,9 @@ program qa
         exit
       end if
     end do
+
+    print *, 'initial gamma'
+    read(*,*) gamma_init
     ! set n
     read(IN,*) n
 
@@ -111,6 +114,7 @@ program qa
   call mpi_bcast(mt, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
   call mpi_bcast(m, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
   call mpi_bcast(n, 1, MPI_INTEGER, ROOT, MPI_COMM_WORLD, ierror)
+  call mpi_bcast(gamma_init, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
 
   !--------read parameter(rf. roman martonak et al.)------
   ! set beta(becaues mt = m  / beta))
@@ -118,11 +122,10 @@ program qa
 
   ! set initial gamma
   if (abs(mt-1) < EPS) then
-    gamma_init = 3
+    !gamma_init = 3
   else
-    gamma_init = 2.5
+    !gamma_init = 2.5
   end if
-
 
   ! set gamma and qa_step
   gamma = gamma_init
@@ -130,9 +133,9 @@ program qa
 
   !-------- parameter reset------
   ! reset beta(kt = 0.1)
-   !beta = 10
- ! reset initial gamma
-   gamma_init = 3
+  !  beta = 10
+  ! reset initial gamma
+  !gamma_init = 3
 
 
   !-------- parameter for parallel processing------
@@ -180,6 +183,9 @@ program qa
 
   ! initialize spin of all slice
   call init_sg(spin_old, m_sub+1, n)
+
+  tau = -1
+  call spndat(tau, spin_old, energ, k, m, n)
 
   !======== Preannealing with SA ========
   ! do
@@ -272,21 +278,34 @@ program qa
     end do
 
     !end judge and check state of each slice
-    !if energy between adjacent slice is the same , increment local_count
+    ![END JUDGE1] if energy between adjacent slice is the same , increment local_count
+    if(myrank == 0) then
+      print * , "qa_step : ", tau
+    end if
+
     local_count = 0
     do k = 1, m_sub
       if (k < m_sub .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
+      !for data analysis
+      if ((k == 1 .and. myrank == 0) .and. mod(tau, DEV) == 0) then
+        call spndat(tau/DEV, spin_old, energ, k, m, n)
+      end if
       print *, gamma , energ(k)
     end do
 
+    !recuce local_count to global_count
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
 
-    !print *, "global_count", global_count
+    !output global_count
+    if(myrank == 0) then
+      print *, "global_count", global_count
+    end if
 
-    !if energ is the same in each slice, make sure energy between the processes is the same
+
+    !![END JUDGE 2] if energ is the same in each slice, make sure energy between the processes is the same
     if(global_count .ge. (m_sub - 1) * nprocs) then
       local_count = 0
       energ_send = energ(1)
@@ -300,19 +319,21 @@ program qa
         local_count = local_count + 1
       end if
 
+      !reduce local_count to global_count
       call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
         MPI_COMM_WORLD, ierror)
 
-      !print *, "global_count2", global_count
+      !output global_count
+      if(myrank == 0) then
+        print *, "global_count2", global_count
+      end if
 
-      !end program
+      ![END PRGRAM] if(global_count > nprocs - 2) stop program
       if (global_count .ge. nprocs - 2) then
         call mpi_barrier(MPI_COMM_WORLD, ierror)
         t1 = mpi_wtime()
 
-        if(myrank == 0) then
-          print *, "time : ", t1 - t0
-        end if
+        print *, "time : ", t1 - t0
 
         !call mpi_type_free(vec_type, ierror)
 
@@ -323,7 +344,6 @@ program qa
         stop
 
       end if
-
     end if
 
     ! update gamma
@@ -341,7 +361,7 @@ program qa
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   close(IN)
-  close(IN2)
+  !close(IN2)
 
 contains
 
@@ -476,6 +496,28 @@ contains
 
   end subroutine spin_copy_to3D
 
+  subroutine spndat(tau, spin, energ, k, m, n)
+    implicit none
+    integer(SI), intent(in) :: k, n, m
+    integer(DI), intent(in) :: tau
+    integer(SI), dimension(n,n,m), intent(in) :: spin
+    real(DR), dimension(m), intent(in) :: energ
+    integer(SI) :: ix,iy
+    integer(SI), parameter :: iw = 5000
+    character(len=128) :: file_name
+
+    file_name = trim('./data/en.dat')
+
+    if(tau.eq.-1) then
+      open(iw,file=file_name,STATUS="replace")
+      write(iw,*) "# Time        Energy"
+      close(iw)
+    else
+      open(iw,FILE=file_name, status="old", position="append")
+      write(iw,*) tau, energ(k)/(n**2)
+      close(iw)
+    endif
+  end subroutine spndat
 
 
 end program qa
