@@ -54,7 +54,7 @@ program qa
   !======== initialize ========
   !-------- initialize for io-------
   ! open file
-  open(in, file = "SG_complex.dat", status = 'old')
+  open(in, file = "SG.dat", status = 'old')
   open(out, file = "Params.dat", status = 'replace')
 
   !-------- parameter for qa(rf. roman martonak et al.)------
@@ -98,11 +98,11 @@ program qa
   r_gamma = 1.0001
 
   ! read m
-  print *, 'm(dont set square number for plot)[default :10]'
+  print *, 'm(dont set square number for plot)[default :48]'
   read(*,*) m
-  print * , "r_beta"
+  print * , "r_beta[default : 1.01]"
   read(*,*) r_beta
-  print *, "r_gamma"
+  print *, "r_gamma[default : 1.0001]"
   read(*,*) r_gamma
 
   !-------- parameter set for qa------

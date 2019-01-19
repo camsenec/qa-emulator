@@ -38,7 +38,7 @@ do
     echo "set mxtics 2"
     echo "set mytics 2"
     echo "set grid front mxtics mytics lw 1 lt -1 lc rgb 'gray'"
-    echo "set title 'slice ${J} : Time =         ${I} (x2000)'"
+    echo "set title 'slice ${J} : Time =         ${I} (x5)'"
     echo "plot '${file}' every ::${start_line}:${start_block}:${end_line}:${end_block} w image"
     echo
     J=$(expr $J + 1)
@@ -47,14 +47,14 @@ do
   file="./data/en001.dat"
   now_line=$(expr $I - 1)
 
-  echo "set xtics 200."
+  echo "set xtics 300."
   echo "set ytics 0.5"
   echo "set mxtics 10"
   echo "set mytics 5"
   echo "set format x '%3.0f'"
   echo "set format y '%3.1f'"
   echo "set tics scale 1,0.5"
-  echo "set xlabel 'Time (x3000)'"
+  echo "set xlabel 'Time (x5)'"
   echo "set ylabel 'Energy (per site)'"
   echo "set autoscale x"
   echo "set yrange[-2:0]"
@@ -67,4 +67,3 @@ do
 
   I=$(expr $I + 1)
 done
-echo "pause -1"

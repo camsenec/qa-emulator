@@ -30,6 +30,6 @@ result:result.f90
 	$(FC) result.f90 -o result
 
 clean:
-	rm -rf $(OBJS) pimc *.mod *QA*
+	rm -rf $(OBJS) pimc result *.mod *QA*
 
 
