@@ -130,7 +130,6 @@ program qa
     read(*,*) r_gamma
     print *, 'm(dont set square number for plot)[default :48]'
     read(*,*) m
-    !read(PARAM,*), r_beta, r_gamma, m
   end if
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)
