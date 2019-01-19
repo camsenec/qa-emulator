@@ -17,10 +17,10 @@ OBJS_LIGHT = constants.o \
        calc_energ.o \
 			 qa_light.o
 
-main: pimc
+main: pimc data
 	time ./pimc
 
-light: pimc_light
+light: pimc_light data
 	time ./pimc_light
 
 pimc: $(OBJS)
@@ -28,6 +28,9 @@ pimc: $(OBJS)
 
 pimc_light: $(OBJS_LIGHT)
 	$(FC) $(OBJS_LIGHT) -o pimc_light
+
+data:
+	mkdir data
 
 graph:
 	chmod 755 make_gif.sh
