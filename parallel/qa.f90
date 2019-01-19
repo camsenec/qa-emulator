@@ -44,7 +44,7 @@ program qa
 
   !--------parameter for QA--------
   ! qa_step : 量子アニーリングテップ数, sa_step : 古典アニーリングステップ数
-  integer(DI) :: qa_step
+  integer(DI) :: qa_step, sa_step
   ! j_tilda : トロッタースライスごとの相互作用におけるカップリング
   real(DR) :: j_tilda
   ! gamma : アニーリング係数
@@ -81,7 +81,7 @@ program qa
   !======== initialize parameter ========
   !-------- initialize for io-------
   ! open filei
-  open(IN, file = "SG_complex.dat", status = 'old')
+  open(IN, file = "SG.dat", status = 'old')
   open(PARAM, file = "paramIn.dat", status = 'old')
   open(OUT,file = 'data.dat', status = 'old', position = 'append')
   open(OUT2,file = 'time.dat', status = 'old', position = 'append')
@@ -116,19 +116,19 @@ program qa
   read(in,*) n
 
   !-------- parameter set for scheduling------
-  sa_step = 300000 / n*n
-  qa_step = 300000 / n*n
+  sa_step = 300000
+  qa_step = 1000000000 /(n*n)
   beta_init = 0.2
   gamma_init = 3
   r_beta = (m / beta_init)**(1.0/sa_step)
   r_gamma = 1.0001
 
   if(myrank == 0) then
-    print * , "r_beta"
+    print * , "r_beta[default : 1.01]"
     read(*,*) r_beta
-    print *, "r_gamma"
+    print *, "r_gamma[default : 1.0001]"
     read(*,*) r_gamma
-    print *, 'm(dont set square number for plot)[default :10]'
+    print *, 'm(dont set square number for plot)[default :48]'
     read(*,*) m
   end if
 
@@ -266,22 +266,24 @@ program qa
 
     ! end judge and check state of each slice
     ! [END JUDGE1] if energy between adjacent slice is the same , increment local_count
-    local_count = 0
     do k = 1, m_sub
       if (k < m_sub  .and. abs(energ(k) - energ(k + 1)) .le. EPS*1e-4) then
         local_count = local_count + 1
       end if
       !for data analysis
-      print *, beta, gamma , energ(k)
+      if(myrank == 0) then
+        print *, beta, gamma , energ(k)
+      end if
     end do
 
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
 
 
+    
+    local_count = 0
     ![END JUDGE2] if energ is the same in each slice, make sure energy between the processes is the same
      if(global_count .ge. (m_sub - 1) * nprocs) then
-      local_count = 0
       energ_send = energ(1)
 
       call mpi_sendrecv(energ_send, 1, MPI_REAL8, lower, 100,  &
@@ -305,13 +307,11 @@ program qa
 
         if(myrank == 0) then
           write(OUT,*) minval(energ)
-          write(OUT2, '(F10.3)') t1 - t0
+          write(OUT2, '(i0)') tau
         end if
 
         !output time
         print *, "time : ", t1 - t0
-
-        !call mpi_type_free(vec_type, ierror)
 
         deallocate(j_couple)
         deallocate(spin_old, spin_new)
@@ -345,14 +345,11 @@ program qa
   t1 = mpi_wtime()
 
   print *, "time : ", t1 - t0
-  write(OUT2, '(F10.3)') t1 - t0
-
-  !call mpi_type_free(vec_type, ierror)
+  write(OUT2, '(i0)') tau
 
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   close(IN)
-  !close(IN2)
   close(PARAM)
   close(OUT)
   close(OUT2)
