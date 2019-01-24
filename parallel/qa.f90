@@ -121,17 +121,18 @@ program qa
   qa_step = 1000000000 /(n*n)
   beta_init = 0.2
   gamma_init = 3
-  r_beta = (m / beta_init)**(1.0/sa_step)
+  r_beta = 1.01
   r_gamma = 1.0001
 
-  !if(myrank == 0) then
+  if(myrank == 0) then
   !  print * , "r_beta[default : 1.01]"
   !  read(*,*) r_beta
   !  print *, "r_gamma[default : 1.0001]"
   !  read(*,*) r_gamma
   !  print *, 'm(dont set square number for plot)[default :48]'
   !  read(*,*) m
-  !end if
+     read(PARAM, *) r_beta, r_gamma, m
+  end if
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   call mpi_bcast(r_beta, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)
