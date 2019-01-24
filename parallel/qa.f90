@@ -29,7 +29,7 @@ program qa
   integer(SI), allocatable, dimension(:) :: spin_old_send, spin_old_recv
   ! energ_old(i,:) : i番目のスライスの遷移前のエネルギー
   ! energ_new(i,:) : i番目のスライスの遷移後のエネルギー
-  real(DR), dimension(10000) :: energ
+  real(DR), dimension(100) :: energ
   ! energ_old_qa : 遷移前の合計エネルギー, energ_new_qa : 遷移後の合計エネルギ-
   ! energ_delta : 遷移前から遷移後のエネルギー差
   real(DR) :: energ_old_qa, energ_new_qa, energ_delta, energ_old_qa_part
@@ -121,7 +121,7 @@ program qa
   qa_step = 1000000000 /(n*n)
   beta_init = 0.2
   gamma_init = 3
-  r_beta = (m / beta_init)**(1.0/300000)
+  r_beta = (m / beta_init)**(1.0/sa_step)
   r_gamma = 1.0001
 
   !if(myrank == 0) then
@@ -186,7 +186,6 @@ program qa
 
   ! initialize spin of all slice
   call init_sg(spin_old, m_sub+1, n)
-
 
   !======== Quantumn Annealing ========
 
@@ -280,6 +279,8 @@ program qa
 
     call mpi_allreduce(local_count, global_count, 1, MPI_INTEGER, MPI_SUM, &
       MPI_COMM_WORLD, ierror)
+
+
     
     local_count = 0
     ![END JUDGE2] if energ is the same in each slice, make sure energy between the processes is the same
@@ -318,6 +319,7 @@ program qa
         close(IN)
         close(PARAM)
         close(OUT)
+        close(OUT2)
         stop
 
       end if

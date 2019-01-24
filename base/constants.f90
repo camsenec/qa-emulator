@@ -19,7 +19,8 @@ module constants_m
   ! in3 : 読み込みファイルのための装置番号
   integer(SI),parameter :: out = 19
 
-  integer(SI),parameter :: DIV = 5
+  integer(SI),parameter :: DIV = 10
+  integer(SI), parameter :: DIV_LIGHT = 5
 
 
 end module constants_m

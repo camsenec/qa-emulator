@@ -1,6 +1,6 @@
 a.out
-PIMC
 pimc
+pimc_light
 *.o
 *.mod
 grapher/*.dat

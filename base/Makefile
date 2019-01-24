@@ -12,12 +12,25 @@ OBJS = constants.o \
        calc_energ.o \
        qa.o
 
-main: pimc
+
+OBJS_LIGHT = constants.o \
+       calc_energ.o \
+			 qa_light.o
+
+main: pimc data
 	time ./pimc
+
+light: pimc_light data
+	time ./pimc_light
 
 pimc: $(OBJS)
 	$(FC) $(OBJS) -o pimc
 
+pimc_light: $(OBJS_LIGHT)
+	$(FC) $(OBJS_LIGHT) -o pimc_light
+
+data:
+	mkdir data
 
 graph:
 	chmod 755 make_gif.sh
@@ -27,5 +40,8 @@ graph:
 view:
 	open -a Safari.app QA.gif
 
+sampleview:
+	open -a Safari.app QA_sample.gif
+
 clean:
-	rm -rf $(OBJS) pimc *.mod
+	rm -rf $(OBJS) $(OBJS_LIGHT) pimc *.mod pimc_light ./data/*
