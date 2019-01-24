@@ -5,10 +5,10 @@
 !-------------------------------------------------------------------
 
 program qa
+  use mpi
   use constants_m
   use calc_energ_m
   implicit none
-  include 'mpif.h'
 
   !=========parameter　declarelation========
   !---------parameter for spinglass and general---------
@@ -116,6 +116,7 @@ program qa
   read(in,*) n
 
   !-------- parameter set for scheduling------
+  m = 48
   sa_step = 300000
   qa_step = 1000000000 /(n*n)
   beta_init = 0.2
@@ -123,14 +124,14 @@ program qa
   r_beta = (m / beta_init)**(1.0/300000)
   r_gamma = 1.0001
 
-  if(myrank == 0) then
-    print * , "r_beta[default : 1.01]"
-    read(*,*) r_beta
-    print *, "r_gamma[default : 1.0001]"
-    read(*,*) r_gamma
-    print *, 'm(dont set square number for plot)[default :48]'
-    read(*,*) m
-  end if
+  !if(myrank == 0) then
+  !  print * , "r_beta[default : 1.01]"
+  !  read(*,*) r_beta
+  !  print *, "r_gamma[default : 1.0001]"
+  !  read(*,*) r_gamma
+  !  print *, 'm(dont set square number for plot)[default :48]'
+  !  read(*,*) m
+  !end if
 
   call mpi_barrier(MPI_COMM_WORLD, ierror)
   call mpi_bcast(r_beta, 1, MPI_REAL8, ROOT, MPI_COMM_WORLD, ierror)

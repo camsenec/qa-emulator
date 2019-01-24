@@ -1,13 +1,13 @@
 .PHONY:clean
 
-FC = ifort
-FFLAGS = -lmpi
+FC = mpif90
+FFLAGS = -xAVX
 INCLUDE = -I/opt/sgi/mpt/mpt-2.14/include/
 
 .SUFFIXES:.f90 .o
 
 .f90.o:
-	$(FC) -c $< $(FFLAGS)
+	$(FC) $(FFLAGS) -c $<
 
 OBJS = constants.o \
        calc_energ.o \
@@ -24,7 +24,7 @@ task:result
 	./task.sh params.dat
   
 pimc:$(OBJS)
-	$(FC) $(OBJS) -o pimc $(FFLAGS)
+	$(FC) $(FFLAGS) $(OBJS) -o pimc
 
 result:result.f90
 	$(FC) result.f90 -o result
