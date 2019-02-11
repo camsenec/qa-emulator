@@ -51,13 +51,14 @@ program qa
   !======== initialize ========
   !-------- initialize for io-------
   ! open file
-  open(IN, file = "SG.dat", status = 'old')
-  open(OUT, file = "../grapher/qa_step.dat", status = 'replace')
+  open(IN, file = "SG_complex.dat", status = 'old')
+  open(OUT, file = "../grapher/qa_step.dat", status = 'old', position = "append")
 
   !-------- parameter for qa(rf. roman martonak et al.)------
   !read m
   print *, 'm(dont set square number for plot)[default :10]'
-  read(*,*) m
+  !read(*,*) m
+  m = 10
 
   ! set beta
   beta = 10_DR
@@ -71,6 +72,7 @@ program qa
   !-------- parameter set for qa------
 
   !set initial gamma
+  !gamma = gamma_init
   gamma = gamma_init
   ! set qa_step
   qa_step = 1000000 / (n*n)
@@ -137,7 +139,7 @@ program qa
           if (energ_delta <= 0) then
             prob = 1
           else
-            prob = exp(-beta * energ_delta)
+            prob = exp(-(beta) * energ_delta)
           end if
 
           ! update sg based on probability p
@@ -174,11 +176,15 @@ program qa
     end if
 
     !update gamma
-    gamma = gamma*0.99
+    gamma = gamma_init*0.995**tau
 
   end do
 
-  write(OUT, '(a, i0)') 'qa_step=', tau/DIV
+  open(1000, file = "result.dat", status = "old", position = "append")
+  write(1000, '(f12.5)') minval(energ_old)
+  close(1000)
+
+  !write(OUT, '(a, i0)') 'qa_step=', tau/DIV
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   deallocate(energ_old, energ_new)
