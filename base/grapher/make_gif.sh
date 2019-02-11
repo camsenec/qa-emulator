@@ -11,7 +11,7 @@ echo "unset key"
 echo "unset colorbox"
 echo
 
-file_num=`ls ./data/spin*.dat | sort | wc -l`
+file_num=`ls ../data/spin*.dat | sort | wc -l`
 layout_num=`echo "sqrt($file_num)"|bc`
 layout_num=$(expr $layout_num + 1)
 #layout_row=$(expr $layout_base/layout_column)
@@ -22,7 +22,7 @@ while [ $I -le ${qa_step} ]
 do
   echo "set multiplot layout ${layout_num},${layout_num}"
   J=1
-  for file in `ls ./data/spin*.dat | sort`
+  for file in `ls ../data/spin*.dat | sort`
   do
     start_line=0
     start_block=$(expr \( $I - 1 \) \* $N)
@@ -44,7 +44,7 @@ do
     J=$(expr $J + 1)
   done
 
-  file="./data/en001.dat"
+  file="../data/en001.dat"
   now_line=$(expr $I - 1)
 
   echo "set xtics 300."

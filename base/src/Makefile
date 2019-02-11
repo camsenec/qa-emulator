@@ -1,7 +1,7 @@
 .PHONY: clean
 
-FC = mpif90
-FFLAGS = -fopenmp
+FC = gfortran
+FFLAGS =
 
 .SUFFIXES: .f90 .o
 
@@ -10,13 +10,19 @@ FFLAGS = -fopenmp
 
 OBJS = constants.o \
        calc_energ.o \
+			 field.o \
        qa.o
 
-main: pimc
-	mpirun -np 4 -quiet ./pimc
+main: pimc data
+	time ./pimc
 
 pimc: $(OBJS)
 	$(FC) $(OBJS) -o pimc
 
+data:
+	mkdir data
+
+
+
 clean:
-	rm -rf $(OBJS) pimc *.mod
+	rm -rf $(OBJS) $(OBJS_LIGHT) pimc *.mod pimc_light ./data/* fort.17

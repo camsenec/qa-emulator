@@ -13,14 +13,11 @@ module constants_m
 
   ! <<IO constants >
   ! in : 読み込みファイルのための装置番号
-  integer(SI),parameter :: in = 17
-  ! in2 : 読み込みファイルのための装置番号
-  integer(SI),parameter :: in2 = 18
+  integer(SI),parameter :: IN = 17
   ! in3 : 読み込みファイルのための装置番号
-  integer(SI),parameter :: out = 19
+  integer(SI),parameter :: OUT = 18
 
   integer(SI),parameter :: DIV = 10
-  integer(SI), parameter :: DIV_LIGHT = 5
 
 
 end module constants_m
