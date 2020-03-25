@@ -12,8 +12,7 @@ This Application emulate quantum annealing based on Path Integral Motecarlo Meth
     
 ## Result
 Gif animation shown below is displayed. 
-![snip20190217_31](https://user-images.githubusercontent.com/27656483/52901500-b7d88d00-3247-11e9-9d11-2d66de7fcf11.png)
-
+![QA](https://user-images.githubusercontent.com/27656483/77493701-1a5a7e80-6e87-11ea-876f-92e5d230a331.gif)
 
 ## Programing language
 Fortran 2003
