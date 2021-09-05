@@ -1,4 +1,4 @@
-# Solve Coloring Problem with Quantum Annealing
+# Quantum Annealing Machine Emulator
 ## Overview
 This Application emulate quantum annealing based on Path Integral Motecarlo Method.
 
