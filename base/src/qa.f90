@@ -184,7 +184,7 @@ program qa
   write(1000, '(f12.5)') minval(energ_old)
   close(1000)
 
-  !write(OUT, '(a, i0)') 'qa_step=', tau/DIV
+  write(OUT, '(a, i0)') 'qa_step=', tau/DIV
   deallocate(j_couple)
   deallocate(spin_old, spin_new)
   deallocate(energ_old, energ_new)

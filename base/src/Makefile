@@ -14,6 +14,7 @@ OBJS = constants.o \
        qa.o
 
 main: pimc data
+	cat /dev/null > ../grapher/qa_step.dat
 	time ./pimc
 
 pimc: $(OBJS)
@@ -21,8 +22,6 @@ pimc: $(OBJS)
 
 data:
 	mkdir data
-
-
 
 clean:
 	rm -rf $(OBJS) $(OBJS_LIGHT) pimc *.mod pimc_light ./data/* fort.17

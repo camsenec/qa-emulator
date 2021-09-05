@@ -11,7 +11,7 @@ echo "unset key"
 echo "unset colorbox"
 echo
 
-file_num=`ls ../data/spin*.dat | sort | wc -l`
+file_num=`ls ../src/data/spin*.dat | sort | wc -l`
 layout_num=`echo "sqrt($file_num)"|bc`
 layout_num=$(expr $layout_num + 1)
 #layout_row=$(expr $layout_base/layout_column)
@@ -22,7 +22,7 @@ while [ $I -le ${qa_step} ]
 do
   echo "set multiplot layout ${layout_num},${layout_num}"
   J=1
-  for file in `ls ../data/spin*.dat | sort`
+  for file in `ls ../src/data/spin*.dat | sort`
   do
     start_line=0
     start_block=$(expr \( $I - 1 \) \* $N)
@@ -44,9 +44,10 @@ do
     J=$(expr $J + 1)
   done
 
-  file="../data/en001.dat"
+  file="../src/data/en001.dat"
   now_line=$(expr $I - 1)
-
+  
+  echo "unset title"
   echo "set xtics 300."
   echo "set ytics 0.5"
   echo "set mxtics 10"
@@ -57,9 +58,10 @@ do
   echo "set xlabel 'Time (x5)'"
   echo "set ylabel 'Energy (per site)'"
   echo "set autoscale x"
-  echo "set yrange[-2:0]"
+  echo "set autoscale y"
+  echo "set yrange[-6.5:-5.5]"
   echo "unset grid"
-  echo "unset title"
+  #echo "unset title"
   echo "plot '${file}' every ::0:0:${now_line}:0 using 1:2 w l lc 2 lw 3 noti,\\"
   echo "'${file}' every ::${now_line}:0:${now_line}:0 using 1:2 w p lc 2 ps 1.5 pt 7 noti"
   echo "unset multiplot"
