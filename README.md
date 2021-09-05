@@ -10,7 +10,8 @@ $ cd ./qa-emulator/base/src
 $ make
 $ cd ../grapher && make
 
-open QA.gif with your favorite software
+open QA.gif with your favorite viewer 
+
 ```
 
 ## Result
