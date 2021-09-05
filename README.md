@@ -21,7 +21,7 @@ Gif animation which shows energy transition on each slice is stored at grapher/Q
 Fortran 2003
 
 ## Other git repository
-- [Server Side] https://github.com/camsenec/qasim_server
+- [Server Side] https://github.com/camsenec/qasim-server
 - [Solver] https://github.com/camsenec/qasim-solver
 - [Android Application] https://github.com/camsenec/qasim
 
