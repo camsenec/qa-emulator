@@ -2,13 +2,16 @@
 ## Overview
 This Application emulate quantum annealing based on Path Integral Motecarlo Method.
 
-## Usage[on Mac]
+## Usage
 
-    1. git clone https://github.com/camsenec/qa-emulator.git
-    2. cd ./qa-emulator/base/src
-    3. make
-    4. cd ../grapher && make
-    5. open QA.gif
+```
+$ git clone https://github.com/camsenec/qa-emulator.git
+$ cd ./qa-emulator/base/src
+$ make
+$ cd ../grapher && make
+
+open QA.gif with your favorite software
+```
 
 ## Result
 Gif animation which shows energy transition on each slice is stored at grapher/QA.gif
